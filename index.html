@@ -1,0 +1,773 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Calculadora de Delineamento</title>
+<meta name="theme-color" content="#0b6e8a">
+<meta name="description" content="Cálculo de área de superfície a pintar por elemento.">
+<link rel="manifest" href="manifest.json">
+<link rel="icon" type="image/png" href="icons/icon-192.png">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Delineamento">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<style>
+  :root{
+    --bg:#f4f6f8; --card:#ffffff; --ink:#14202b; --muted:#5c6b7a; --line:#d5dde5;
+    --accent:#0b6e8a; --accent-ink:#ffffff; --accent-soft:#e1f1f6; --warn:#b3261e; --ok:#1b7a43;
+  }
+  @media (prefers-color-scheme: dark){
+    :root{
+      --bg:#0f161c; --card:#17212a; --ink:#e8eef3; --muted:#93a3b2; --line:#2a3946;
+      --accent:#3cb4d3; --accent-ink:#06222b; --accent-soft:#143440; --warn:#ff8a80; --ok:#6fd49a;
+    }
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+  main{max-width:760px;margin:0 auto;padding:20px 16px 60px}
+  h1{font-size:1.4rem;margin:0 0 2px}
+  .sub{color:var(--muted);margin:0 0 18px;font-size:.95rem}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:16px;margin-bottom:16px}
+  .lbl{display:block;font-size:.85rem;font-weight:600;color:var(--muted);margin:14px 0 6px}
+  .lbl:first-child{margin-top:0}
+  .chips{display:flex;flex-wrap:wrap;gap:8px}
+  .chips input{position:absolute;opacity:0;pointer-events:none}
+  .chips label{border:1px solid var(--line);border-radius:999px;padding:7px 14px;cursor:pointer;font-size:.92rem;user-select:none;background:var(--card)}
+  .chips input:checked + label{background:var(--accent);color:var(--accent-ink);border-color:var(--accent);font-weight:600}
+  .chips input:focus-visible + label{outline:2px solid var(--accent);outline-offset:2px}
+  input[type=text],select{width:100%;padding:12px 14px;border:1px solid var(--line);border-radius:10px;background:var(--bg);color:var(--ink);font:inherit}
+  input[type=text]:focus,select:focus{outline:2px solid var(--accent);border-color:transparent}
+  .grid{display:grid;grid-template-columns:1fr 1fr;gap:0 14px}
+  @media (max-width:560px){.grid{grid-template-columns:1fr}}
+  .check{display:flex;gap:10px;align-items:center;margin-top:16px;font-size:.95rem}
+  .check input{width:20px;height:20px;accent-color:var(--accent)}
+  details{margin-top:16px;border-top:1px solid var(--line);padding-top:12px}
+  summary{cursor:pointer;font-weight:600;color:var(--accent)}
+  button{font:inherit;cursor:pointer;border-radius:10px;border:1px solid var(--line);background:var(--card);color:var(--ink);padding:10px 14px}
+  button.primary{width:100%;background:var(--accent);color:var(--accent-ink);border-color:var(--accent);font-weight:700;padding:14px;margin-top:18px;font-size:1.05rem}
+  button.small{padding:6px 10px;font-size:.85rem}
+  .err{color:var(--warn);margin-top:12px;font-weight:600}
+  .result{border-color:var(--accent);background:var(--accent-soft)}
+  .big{font-size:2.2rem;font-weight:800;line-height:1.1}
+  .big small{font-size:1rem;font-weight:600;color:var(--muted)}
+  .formula{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:.85rem;color:var(--muted);margin:10px 0 0;word-break:break-word}
+  .kv{display:flex;justify-content:space-between;gap:12px;padding:6px 0;border-bottom:1px dashed var(--line)}
+  .kv:last-child{border-bottom:0}
+  .row-actions{display:flex;flex-wrap:wrap;gap:8px;margin-top:14px}
+  .hist-item{border:1px solid var(--line);border-radius:10px;padding:10px 12px;margin-top:10px;display:flex;justify-content:space-between;gap:10px;align-items:flex-start}
+  .hist-item b{display:block}
+  .hist-item span{color:var(--muted);font-size:.85rem}
+  .total{display:flex;justify-content:space-between;font-weight:700;margin-top:14px;padding-top:12px;border-top:2px solid var(--line)}
+  #installBox{display:flex;flex-wrap:wrap;align-items:center;gap:10px;margin:0 0 16px;padding:12px 14px;border:1px dashed var(--accent);border-radius:12px;background:var(--accent-soft);font-size:.92rem}
+  #installBox button{background:var(--accent);color:var(--accent-ink);border-color:var(--accent);font-weight:700}
+  #installBox .x{background:transparent;color:var(--muted);border-color:transparent;margin-left:auto}
+  #toast{position:fixed;left:50%;bottom:24px;transform:translate(-50%,20px);background:var(--ink);color:var(--bg);padding:10px 16px;border-radius:10px;font-size:.9rem;opacity:0;pointer-events:none;transition:opacity .2s,transform .2s;max-width:90vw;z-index:10;text-align:center}
+  #toast.show{opacity:1;transform:translate(-50%,0)}
+  .hidden{display:none}
+</style>
+</head>
+<body>
+<main>
+  <h1>Calculadora de Delineamento</h1>
+  <p class="sub">Área de superfície a pintar por elemento. Resultados em m².</p>
+
+  <div id="installBox" class="hidden">
+    <span id="installMsg">Instale como app para abrir direto da tela inicial e usar offline.</span>
+    <button type="button" id="installBtn" class="hidden">Instalar app</button>
+    <button type="button" class="small x" id="installClose" aria-label="Fechar">Fechar</button>
+  </div>
+
+  <section class="card">
+    <span class="lbl">Tipo de elemento</span>
+    <div class="chips" id="types"></div>
+
+    <span class="lbl">Unidade das medidas lineares</span>
+    <div class="chips" id="units"></div>
+
+    <div class="grid" id="fields"></div>
+
+    <div class="grid">
+      <div>
+        <label class="lbl" for="qtd">Quantidade de peças</label>
+        <input type="text" id="qtd" inputmode="numeric" value="1">
+      </div>
+      <div></div>
+    </div>
+
+    <label class="lbl" for="ref">Referência (projeto / inspeção / relatório)</label>
+    <input type="text" id="ref" placeholder="Ex: Projeto Tanque TQ-04, Inspeção RIP-0032">
+
+    <label class="lbl" for="desc">Descrição do elemento</label>
+    <input type="text" id="desc" placeholder="Ex: Perfil I 200 mm, viga de sustentação">
+
+    <details>
+      <summary>Estimar consumo de tinta (opcional)</summary>
+      <div class="grid">
+        <div>
+          <label class="lbl" for="dft">Espessura seca – EPS (µm)</label>
+          <input type="text" id="dft" inputmode="decimal" placeholder="Ex: 200">
+        </div>
+        <div>
+          <label class="lbl" for="sv">Sólidos por volume (%)</label>
+          <input type="text" id="sv" inputmode="decimal" placeholder="Ex: 60">
+        </div>
+        <div>
+          <label class="lbl" for="perda">Perdas de aplicação (%)</label>
+          <input type="text" id="perda" inputmode="decimal" placeholder="Ex: 30">
+        </div>
+      </div>
+    </details>
+
+    <button class="primary" id="go" type="button">Calcular</button>
+    <div class="err hidden" id="err" role="alert"></div>
+  </section>
+
+  <section class="card result hidden" id="res" aria-live="polite">
+    <div class="big" id="resArea"></div>
+    <p class="formula" id="resFormula"></p>
+    <div id="resExtra" style="margin-top:12px"></div>
+    <div class="row-actions">
+      <button type="button" id="add">Adicionar ao histórico</button>
+      <button type="button" id="copy">Copiar texto</button>
+      <button type="button" id="shareRes">Compartilhar</button>
+      <button type="button" id="waRes">WhatsApp</button>
+    </div>
+  </section>
+
+  <section class="card" id="histCard">
+    <strong>Histórico</strong>
+    <div id="hist"></div>
+    <div class="total hidden" id="total"><span>Área total</span><span id="totalVal"></span></div>
+    <div class="row-actions hidden" id="histActions">
+      <button type="button" id="xlsx">Exportar Excel (.xlsx)</button>
+      <button type="button" id="hCopy">Copiar texto</button>
+      <button type="button" id="hShare">Compartilhar</button>
+      <button type="button" id="hWa">WhatsApp</button>
+      <button type="button" id="hMail">E-mail</button>
+      <button type="button" id="hTxt">Baixar .txt</button>
+      <button type="button" id="clear">Limpar histórico</button>
+    </div>
+    <p class="sub" id="histEmpty" style="margin:10px 0 0">Nenhum cálculo adicionado ainda.</p>
+  </section>
+</main>
+<div id="toast" role="status" aria-live="polite"></div>
+
+<script>
+/*CALC-START*/
+const PI = Math.PI;
+
+function headArea(kind, d){
+  if (kind === 'plano') return PI*d*d/4;
+  const a = d/2, c = d/4, e = Math.sqrt(1 - (c*c)/(a*a));
+  return 0.5 * (2*PI*a*a + PI*(c*c/e)*Math.log((1+e)/(1-e)));
+}
+
+function profilePerimeter(shape, h, b, tf, tw){
+  if (shape === 'I')   return 4*b + 2*h - 2*tw;
+  if (shape === 'U')   return 2*h + 4*b - 2*tw;
+  if (shape === 'T')   return 2*b + 2*h;
+  if (shape === 'BOX') return 2*(b + h);
+  return NaN;
+}
+
+function missing(v, ids){
+  for (const id of ids){ if (!(v[id] > 0)) return true; }
+  return false;
+}
+
+const TYPES = {
+  tubo: {
+    label: 'Tubo / tubulação',
+    fields: [
+      {id:'d', label:'Diâmetro externo', kind:'len', ph:0.32},
+      {id:'l', label:'Comprimento', kind:'len', ph:100},
+      {id:'inner', label:'Pintar também a superfície interna', kind:'check'},
+      {id:'t', label:'Espessura da parede', kind:'len', ph:0.008, show:v=>v.inner}
+    ],
+    calc(v){
+      const need = v.inner ? ['d','l','t'] : ['d','l'];
+      if (missing(v, need)) return {error:'Preencha todos os campos com valores maiores que zero.'};
+      const ext = PI*v.d*v.l;
+      if (!v.inner) return {area: ext, formula:'π × D × L'};
+      if (2*v.t >= v.d) return {error:'A espessura da parede deve ser menor que metade do diâmetro.'};
+      const int = PI*(v.d - 2*v.t)*v.l;
+      return {area: ext+int, formula:'π × D × L  +  π × (D − 2t) × L'};
+    }
+  },
+  perfil: {
+    label: 'Perfil estrutural',
+    fields: [
+      {id:'shape', label:'Seção', kind:'select', options:[['I','I / H'],['U','U (canal)'],['T','T'],['BOX','Tubular retangular / quadrado']]},
+      {id:'h', label:'Altura (h)', kind:'len', ph:0.2},
+      {id:'b', label:'Largura da mesa / base (b)', kind:'len', ph:0.1},
+      {id:'tf', label:'Espessura da mesa (tf)', kind:'len', ph:0.008, show:v=>v.shape!=='BOX'&&v.shape!=='T'},
+      {id:'tw', label:'Espessura da alma (tw)', kind:'len', ph:0.006, show:v=>v.shape==='I'||v.shape==='U'},
+      {id:'l', label:'Comprimento', kind:'len', ph:6}
+    ],
+    defaults:{shape:'I'},
+    calc(v){
+      const s = v.shape || 'I';
+      const need = ['h','b','l'];
+      if (s==='I'||s==='U') need.push('tw');
+      if (missing(v, need)) return {error:'Preencha todos os campos com valores maiores que zero.'};
+      const tw = v.tw||0, tf = v.tf||0;
+      if ((s==='I'||s==='U') && tw >= v.b) return {error:'A espessura da alma deve ser menor que a largura da mesa.'};
+      const p = profilePerimeter(s, v.h, v.b, tf, tw);
+      const f = {I:'(4·b + 2·h − 2·tw) × L', U:'(2·h + 4·b − 2·tw) × L', T:'(2·b + 2·h) × L', BOX:'2·(b + h) × L'}[s];
+      return {area: p*v.l, formula: f, perim: p};
+    }
+  },
+  viga: {
+    label: 'Viga',
+    fields: [
+      {id:'h', label:'Altura da seção (h)', kind:'len', ph:0.4},
+      {id:'b', label:'Largura da mesa (b)', kind:'len', ph:0.2},
+      {id:'tw', label:'Espessura da alma (tw)', kind:'len', ph:0.008},
+      {id:'l', label:'Comprimento', kind:'len', ph:8},
+      {id:'laje', label:'Mesa superior em contato com laje (não pintar a face de cima)', kind:'check'}
+    ],
+    calc(v){
+      if (missing(v, ['h','b','tw','l'])) return {error:'Preencha todos os campos com valores maiores que zero.'};
+      if (v.tw >= v.b) return {error:'A espessura da alma deve ser menor que a largura da mesa.'};
+      const p = 4*v.b + 2*v.h - 2*v.tw;
+      let a = p*v.l;
+      let f = '(4·b + 2·h − 2·tw) × L';
+      if (v.laje){ a -= v.b*v.l; f += '  −  b × L'; }
+      return {area: a, formula: f, perim: p};
+    }
+  },
+  chapa: {
+    label: 'Chapa / placa',
+    fields: [
+      {id:'c', label:'Comprimento', kind:'len', ph:2},
+      {id:'w', label:'Largura', kind:'len', ph:1},
+      {id:'faces', label:'Faces a pintar', kind:'select', options:[['1','1 face'],['2','2 faces']]},
+      {id:'bordas', label:'Incluir as bordas', kind:'check'},
+      {id:'e', label:'Espessura', kind:'len', ph:0.01, show:v=>v.bordas}
+    ],
+    defaults:{faces:'1'},
+    calc(v){
+      const need = v.bordas ? ['c','w','e'] : ['c','w'];
+      if (missing(v, need)) return {error:'Preencha todos os campos com valores maiores que zero.'};
+      const n = Number(v.faces||1);
+      let a = n*v.c*v.w;
+      let f = n + ' × C × W';
+      if (v.bordas){ a += 2*(v.c+v.w)*v.e; f += '  +  2·(C + W) × e'; }
+      return {area: a, formula: f};
+    }
+  },
+  cantoneira: {
+    label: 'Cantoneira',
+    fields: [
+      {id:'a', label:'Aba A', kind:'len', ph:0.076},
+      {id:'b', label:'Aba B', kind:'len', ph:0.076},
+      {id:'l', label:'Comprimento', kind:'len', ph:6}
+    ],
+    calc(v){
+      if (missing(v, ['a','b','l'])) return {error:'Preencha todos os campos com valores maiores que zero.'};
+      const p = 2*(v.a+v.b);
+      return {area: p*v.l, formula:'2·(A + B) × L', perim: p};
+    }
+  },
+  tanque: {
+    label: 'Tanque / esfera',
+    fields: [
+      {id:'kind', label:'Geometria', kind:'select', options:[['esfera','Esfera'],['plano','Cilindro com tampos planos'],['elip','Cilindro com tampos elípticos 2:1']]},
+      {id:'d', label:'Diâmetro', kind:'len', ph:10},
+      {id:'h', label:'Comprimento / altura do casco', kind:'len', ph:12, show:v=>v.kind!=='esfera'},
+      {id:'tampos', label:'Tampos a pintar', kind:'select', options:[['0','Nenhum'],['1','1 tampo'],['2','2 tampos']], show:v=>v.kind!=='esfera'}
+    ],
+    defaults:{kind:'esfera', tampos:'2'},
+    calc(v){
+      const k = v.kind || 'esfera';
+      if (k==='esfera'){
+        if (missing(v, ['d'])) return {error:'Informe o diâmetro.'};
+        return {area: PI*v.d*v.d, formula:'π × D²'};
+      }
+      if (missing(v, ['d','h'])) return {error:'Preencha todos os campos com valores maiores que zero.'};
+      const n = Number(v.tampos==null?2:v.tampos);
+      const casco = PI*v.d*v.h;
+      const head = headArea(k, v.d);
+      const f = 'π × D × H' + (n ? '  +  ' + n + ' × ' + (k==='plano' ? 'π·D²/4' : '≈1,084·D²') : '');
+      return {area: casco + n*head, formula: f};
+    }
+  },
+  linear: {
+    label: 'Desenvolvimento linear',
+    fields: [
+      {id:'l', label:'Comprimento', kind:'len', ph:50},
+      {id:'dev', label:'Desenvolvimento (perímetro a pintar por metro)', kind:'len', ph:0.5}
+    ],
+    calc(v){
+      if (missing(v, ['l','dev'])) return {error:'Preencha todos os campos com valores maiores que zero.'};
+      return {area: v.l*v.dev, formula:'L × desenvolvimento'};
+    }
+  }
+};
+
+const UNITS = {m:{label:'m', f:1}, mm:{label:'mm', f:0.001}, pol:{label:'pol', f:0.0254}};
+
+function paintVolume(area, dftUm, svPct, perdaPct){
+  if (!(dftUm > 0) || !(svPct > 0) || svPct > 100) return null;
+  const teorico = area * dftUm / (svPct * 10);
+  const p = perdaPct > 0 ? perdaPct : 0;
+  if (p >= 100) return null;
+  return {teorico, real: teorico / (1 - p/100)};
+}
+/*CALC-END*/
+
+/*EXPORT-START*/
+const XLSX_MIME = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
+
+/* ----- Texto (para copiar / mensageiros / e-mail / .txt) ----- */
+const fmtN = (x, max) => x.toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: max == null ? 3 : max});
+
+function entryBlock(e, idx){
+  const title = [e.ref, e.desc].filter(Boolean).join(' — ') || 'Sem referência';
+  const pad = idx ? '   ' : '';
+  const lines = [(idx ? idx + ') ' : '') + title];
+  lines.push(pad + 'Elemento: ' + e.type + (e.qtd > 1 ? ' × ' + e.qtd + ' peças' : ''));
+  if (e.dims) lines.push(pad + 'Medidas: ' + e.dims);
+  lines.push(pad + 'Área: ' + fmtN(e.area) + ' m²' + (e.qtd > 1 ? ' (' + fmtN(e.unitArea) + ' m² por peça)' : ''));
+  if (e.litros != null) lines.push(pad + 'Tinta (com perdas): ' + fmtN(e.litros) + ' L');
+  return lines.join('\n');
+}
+
+function buildText(entries, when){
+  const d = when ? new Date(when) : new Date();
+  const p = n => String(n).padStart(2, '0');
+  const stamp = p(d.getDate()) + '/' + p(d.getMonth() + 1) + '/' + d.getFullYear() + ' ' + p(d.getHours()) + ':' + p(d.getMinutes());
+  const head = 'DELINEAMENTO — área de superfície a pintar\n' + stamp;
+  if (entries.length === 1) return head + '\n\n' + entryBlock(entries[0], 0);
+  const body = entries.map((e, i) => entryBlock(e, i + 1)).join('\n\n');
+  const total = entries.reduce((s, e) => s + e.area, 0);
+  const comTinta = entries.filter(e => e.litros != null);
+  let foot = 'TOTAL: ' + fmtN(total) + ' m²';
+  if (comTinta.length){
+    foot += '\nTinta total (com perdas): ' + fmtN(comTinta.reduce((s, e) => s + e.litros, 0)) + ' L'
+         + (comTinta.length < entries.length ? ' (somente itens com consumo informado)' : '');
+  }
+  return head + '\n\n' + body + '\n\n' + foot;
+}
+
+/* ----- XLSX (gerador mínimo: ZIP sem compressão + XML) ----- */
+const CRC_TABLE = (() => {
+  const t = new Uint32Array(256);
+  for (let n = 0; n < 256; n++){
+    let c = n;
+    for (let k = 0; k < 8; k++) c = (c & 1) ? (0xEDB88320 ^ (c >>> 1)) : (c >>> 1);
+    t[n] = c >>> 0;
+  }
+  return t;
+})();
+
+function crc32(bytes){
+  let c = 0xFFFFFFFF;
+  for (let i = 0; i < bytes.length; i++) c = CRC_TABLE[(c ^ bytes[i]) & 0xFF] ^ (c >>> 8);
+  return (c ^ 0xFFFFFFFF) >>> 0;
+}
+
+function zipStore(files){
+  const enc = new TextEncoder();
+  const u16 = n => [n & 255, (n >>> 8) & 255];
+  const u32 = n => [n & 255, (n >>> 8) & 255, (n >>> 16) & 255, (n >>> 24) & 255];
+  const parts = [], central = [];
+  let offset = 0;
+  for (const f of files){
+    const name = enc.encode(f.name);
+    const data = typeof f.data === 'string' ? enc.encode(f.data) : f.data;
+    const crc = crc32(data), size = data.length;
+    const local = new Uint8Array([0x50, 0x4b, 3, 4, ...u16(20), ...u16(0x0800), ...u16(0), ...u16(0), ...u16(0x21),
+      ...u32(crc), ...u32(size), ...u32(size), ...u16(name.length), ...u16(0)]);
+    parts.push(local, name, data);
+    central.push(new Uint8Array([0x50, 0x4b, 1, 2, ...u16(20), ...u16(20), ...u16(0x0800), ...u16(0), ...u16(0), ...u16(0x21),
+      ...u32(crc), ...u32(size), ...u32(size), ...u16(name.length), ...u16(0), ...u16(0), ...u16(0), ...u16(0), ...u32(0), ...u32(offset)]), name);
+    offset += local.length + name.length + size;
+  }
+  let cdSize = 0;
+  central.forEach(c => { cdSize += c.length; });
+  const eocd = new Uint8Array([0x50, 0x4b, 5, 6, 0, 0, 0, 0, ...u16(files.length), ...u16(files.length), ...u32(cdSize), ...u32(offset), 0, 0]);
+  const all = parts.concat(central, [eocd]);
+  const total = all.reduce((s, a) => s + a.length, 0);
+  const out = new Uint8Array(total);
+  let pos = 0;
+  all.forEach(a => { out.set(a, pos); pos += a.length; });
+  return out;
+}
+
+function xmlEsc(s){
+  return String(s).replace(/[\x00-\x08\x0B\x0C\x0E-\x1F]/g, '')
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+function colName(i){
+  let s = ''; i++;
+  while (i > 0){ const m = (i - 1) % 26; s = String.fromCharCode(65 + m) + s; i = Math.floor((i - 1) / 26); }
+  return s;
+}
+const r6 = x => Math.round(x * 1e6) / 1e6;
+
+function xlsxSheetXml(entries){
+  const hdr = ['Data', 'Referência', 'Descrição', 'Elemento', 'Medidas', 'Qtd', 'Área por peça (m²)', 'Área total (m²)', 'Tinta com perdas (L)'];
+  const sc = (ref, v, s) => (v == null || v === '') ? '' :
+    '<c r="' + ref + '" t="inlineStr"' + (s ? ' s="' + s + '"' : '') + '><is><t xml:space="preserve">' + xmlEsc(v) + '</t></is></c>';
+  const nc = (ref, v, s) => (v == null || !isFinite(v)) ? '' :
+    '<c r="' + ref + '"' + (s ? ' s="' + s + '"' : '') + '><v>' + v + '</v></c>';
+  const rows = [];
+  rows.push('<row r="1">' + hdr.map((h, i) => sc(colName(i) + '1', h, 1)).join('') + '</row>');
+  let sumArea = 0, sumL = 0, anyL = false;
+  entries.forEach((e, k) => {
+    const r = k + 2;
+    const off = new Date(e.ts).getTimezoneOffset();
+    const serial = (e.ts - off * 60000) / 86400000 + 25569;
+    sumArea += e.area;
+    if (e.litros != null){ sumL += e.litros; anyL = true; }
+    rows.push('<row r="' + r + '">' +
+      nc('A' + r, r6(serial), 4) + sc('B' + r, e.ref) + sc('C' + r, e.desc) + sc('D' + r, e.type) + sc('E' + r, e.dims) +
+      nc('F' + r, e.qtd) + nc('G' + r, r6(e.unitArea), 2) + nc('H' + r, r6(e.area), 2) +
+      (e.litros != null ? nc('I' + r, r6(e.litros), 2) : '') + '</row>');
+  });
+  const n = entries.length, tr = n + 2, last = n + 1;
+  rows.push('<row r="' + tr + '">' + sc('A' + tr, 'TOTAL', 3) +
+    '<c r="H' + tr + '" s="5"><f>SUM(H2:H' + last + ')</f><v>' + r6(sumArea) + '</v></c>' +
+    (anyL ? '<c r="I' + tr + '" s="5"><f>SUM(I2:I' + last + ')</f><v>' + r6(sumL) + '</v></c>' : '') + '</row>');
+  const widths = [17, 24, 30, 24, 46, 7, 18, 16, 20];
+  const cols = widths.map((w, i) => '<col min="' + (i + 1) + '" max="' + (i + 1) + '" width="' + w + '" customWidth="1"/>').join('');
+  return '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
+    '<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">' +
+    '<dimension ref="A1:I' + tr + '"/>' +
+    '<sheetViews><sheetView workbookViewId="0"><pane ySplit="1" topLeftCell="A2" activePane="bottomLeft" state="frozen"/></sheetView></sheetViews>' +
+    '<sheetFormatPr defaultRowHeight="15"/><cols>' + cols + '</cols><sheetData>' + rows.join('') + '</sheetData></worksheet>';
+}
+
+const XLSX_STYLES = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
+  '<styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">' +
+  '<numFmts count="2"><numFmt numFmtId="164" formatCode="0.000"/><numFmt numFmtId="165" formatCode="dd/mm/yyyy hh:mm"/></numFmts>' +
+  '<fonts count="2"><font><sz val="11"/><name val="Calibri"/></font><font><b/><sz val="11"/><name val="Calibri"/></font></fonts>' +
+  '<fills count="3"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill>' +
+  '<fill><patternFill patternType="solid"><fgColor rgb="FFD9EAF0"/><bgColor indexed="64"/></patternFill></fill></fills>' +
+  '<borders count="1"><border><left/><right/><top/><bottom/><diagonal/></border></borders>' +
+  '<cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs>' +
+  '<cellXfs count="6">' +
+  '<xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/>' +
+  '<xf numFmtId="0" fontId="1" fillId="2" borderId="0" xfId="0" applyFont="1" applyFill="1"/>' +
+  '<xf numFmtId="164" fontId="0" fillId="0" borderId="0" xfId="0" applyNumberFormat="1"/>' +
+  '<xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1"/>' +
+  '<xf numFmtId="165" fontId="0" fillId="0" borderId="0" xfId="0" applyNumberFormat="1"/>' +
+  '<xf numFmtId="164" fontId="1" fillId="0" borderId="0" xfId="0" applyNumberFormat="1" applyFont="1"/>' +
+  '</cellXfs><cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles></styleSheet>';
+
+function buildXlsxBytes(entries){
+  const H = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>';
+  return zipStore([
+    {name: '[Content_Types].xml', data: H + '<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">' +
+      '<Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>' +
+      '<Default Extension="xml" ContentType="application/xml"/>' +
+      '<Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/>' +
+      '<Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>' +
+      '<Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/></Types>'},
+    {name: '_rels/.rels', data: H + '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">' +
+      '<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/></Relationships>'},
+    {name: 'xl/workbook.xml', data: H + '<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" ' +
+      'xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets><sheet name="Delineamento" sheetId="1" r:id="rId1"/></sheets></workbook>'},
+    {name: 'xl/_rels/workbook.xml.rels', data: H + '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">' +
+      '<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/>' +
+      '<Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/></Relationships>'},
+    {name: 'xl/styles.xml', data: XLSX_STYLES},
+    {name: 'xl/worksheets/sheet1.xml', data: xlsxSheetXml(entries)}
+  ]);
+}
+/*EXPORT-END*/
+
+/* ---------- UI ---------- */
+(function(){
+  if (typeof document === 'undefined') return;
+  const $ = id => document.getElementById(id);
+  let type = 'tubo', unit = 'm', vals = {}, last = null, hist = [];
+  const KEY = 'delineamento-historico-v1';
+
+  try { hist = JSON.parse(localStorage.getItem(KEY) || '[]'); if (!Array.isArray(hist)) hist = []; } catch(e){ hist = []; }
+  function saveHist(){ try { localStorage.setItem(KEY, JSON.stringify(hist)); } catch(e){} }
+
+  const nf = (x, max) => x.toLocaleString('pt-BR', {minimumFractionDigits:2, maximumFractionDigits: max==null?3:max});
+  const parse = s => {
+    if (s == null) return NaN;
+    s = String(s).trim().replace(',', '.');
+    return s === '' ? NaN : Number(s);
+  };
+  const exampleFor = m => {
+    if (unit === 'mm') return String(Math.round(m*1000*1000)/1000);
+    if (unit === 'pol') return String(Math.round(m/0.0254*100)/100);
+    return String(m);
+  };
+
+  function buildChips(container, name, items, current, onPick){
+    container.innerHTML = '';
+    items.forEach(([key, label]) => {
+      const id = name + '-' + key;
+      const inp = document.createElement('input');
+      inp.type = 'radio'; inp.name = name; inp.id = id; inp.value = key; inp.checked = key === current;
+      inp.addEventListener('change', () => onPick(key));
+      const lb = document.createElement('label'); lb.htmlFor = id; lb.textContent = label;
+      container.append(inp, lb);
+    });
+  }
+
+  function initVals(){
+    vals = Object.assign({}, TYPES[type].defaults || {});
+    TYPES[type].fields.forEach(f => {
+      if (f.kind === 'select' && vals[f.id] == null) vals[f.id] = f.options[0][0];
+    });
+  }
+
+  function renderFields(){
+    const box = $('fields'); box.innerHTML = '';
+    const cfg = TYPES[type];
+    cfg.fields.forEach(f => {
+      if (f.show && !f.show(vals)) return;
+      const wrap = document.createElement('div');
+      if (f.kind === 'check'){
+        wrap.style.gridColumn = '1 / -1';
+        const lb = document.createElement('label'); lb.className = 'check';
+        const cb = document.createElement('input'); cb.type = 'checkbox'; cb.checked = !!vals[f.id];
+        cb.addEventListener('change', () => { vals[f.id] = cb.checked; renderFields(); });
+        lb.append(cb, document.createTextNode(f.label));
+        wrap.append(lb);
+      } else if (f.kind === 'select'){
+        const lb = document.createElement('label'); lb.className = 'lbl'; lb.textContent = f.label; lb.htmlFor = 'f-' + f.id;
+        const sel = document.createElement('select'); sel.id = 'f-' + f.id;
+        f.options.forEach(([k, t]) => { const o = document.createElement('option'); o.value = k; o.textContent = t; sel.append(o); });
+        sel.value = vals[f.id];
+        sel.addEventListener('change', () => { vals[f.id] = sel.value; renderFields(); });
+        wrap.append(lb, sel);
+      } else {
+        const lb = document.createElement('label'); lb.className = 'lbl';
+        lb.htmlFor = 'f-' + f.id; lb.textContent = f.label + ' (' + UNITS[unit].label + ')';
+        const inp = document.createElement('input'); inp.type = 'text'; inp.id = 'f-' + f.id;
+        inp.inputMode = 'decimal'; inp.placeholder = 'Ex: ' + exampleFor(f.ph);
+        inp.value = vals[f.id] == null ? '' : vals[f.id];
+        inp.addEventListener('input', () => { vals[f.id] = inp.value; });
+        wrap.append(lb, inp);
+      }
+      box.append(wrap);
+    });
+  }
+
+  function collect(){
+    const cfg = TYPES[type], out = {};
+    cfg.fields.forEach(f => {
+      if (f.show && !f.show(vals)) return;
+      if (f.kind === 'len') out[f.id] = parse(vals[f.id]) * UNITS[unit].f;
+      else out[f.id] = vals[f.id];
+    });
+    return out;
+  }
+
+  function showError(msg){ const e = $('err'); e.textContent = msg; e.classList.toggle('hidden', !msg); }
+
+  function calculate(){
+    showError(''); $('res').classList.add('hidden'); last = null;
+    const qtd = Math.floor(parse($('qtd').value));
+    if (!(qtd >= 1)) { showError('A quantidade deve ser um número inteiro maior ou igual a 1.'); return; }
+    const r = TYPES[type].calc(collect());
+    if (r.error) { showError(r.error); return; }
+    if (!(r.area > 0) || !isFinite(r.area)) { showError('Os valores informados resultam em área inválida. Confira as medidas.'); return; }
+
+    const total = r.area * qtd;
+    const vol = paintVolume(total, parse($('dft').value), parse($('sv').value), parse($('perda').value));
+    last = {
+      ts: Date.now(), ref: $('ref').value.trim(), desc: $('desc').value.trim(),
+      type: TYPES[type].label, qtd, unitArea: r.area, area: total,
+      litros: vol ? vol.real : null,
+      dims: describeDims()
+    };
+
+    $('resArea').innerHTML = nf(total) + ' <small>m²</small>';
+    $('resFormula').textContent = r.formula + (qtd > 1 ? '   ×  ' + qtd + ' peças' : '');
+    const ex = $('resExtra'); ex.innerHTML = '';
+    const kv = (k, v) => { const d = document.createElement('div'); d.className = 'kv'; const a = document.createElement('span'); a.textContent = k; const b = document.createElement('b'); b.textContent = v; d.append(a, b); ex.append(d); };
+    if (qtd > 1) kv('Área por peça', nf(r.area) + ' m²');
+    if (r.perim) kv('Perímetro da seção', nf(r.perim, 4) + ' m');
+    if (vol){
+      kv('Tinta teórica', nf(vol.teorico) + ' L');
+      kv('Tinta com perdas', nf(vol.real) + ' L');
+    }
+    $('res').classList.remove('hidden');
+    $('res').scrollIntoView({behavior:'smooth', block:'nearest'});
+  }
+
+  function describeDims(){
+    const out = [];
+    TYPES[type].fields.forEach(f => {
+      if (f.show && !f.show(vals)) return;
+      const raw = vals[f.id];
+      if (f.kind === 'len'){
+        const s = String(raw == null ? '' : raw).trim();
+        if (s) out.push(f.label + ': ' + s.replace('.', ',') + ' ' + UNITS[unit].label);
+      } else if (f.kind === 'select'){
+        const o = f.options.find(o => o[0] === raw);
+        if (o) out.push(f.label + ': ' + o[1]);
+      } else if (f.kind === 'check' && raw){
+        out.push(f.label);
+      }
+    });
+    return out.join('; ');
+  }
+
+  function flash(msg){
+    const t = $('toast');
+    t.textContent = msg; t.classList.add('show');
+    clearTimeout(flash.timer);
+    flash.timer = setTimeout(() => t.classList.remove('show'), 3000);
+  }
+
+  async function copyText(text){
+    try { await navigator.clipboard.writeText(text); return true; } catch(e){}
+    try {
+      const ta = document.createElement('textarea');
+      ta.value = text; ta.setAttribute('readonly', '');
+      ta.style.cssText = 'position:fixed;top:0;left:0;opacity:0';
+      document.body.append(ta); ta.select();
+      const ok = document.execCommand('copy');
+      ta.remove();
+      return ok;
+    } catch(e){ return false; }
+  }
+
+  async function doCopy(text){
+    flash((await copyText(text)) ? 'Texto copiado para a área de transferência.' : 'Não foi possível copiar. Tente novamente.');
+  }
+
+  async function doShare(text){
+    if (navigator.share){
+      try { await navigator.share({title: 'Delineamento', text: text}); }
+      catch(e){ if (e && e.name !== 'AbortError') doCopy(text); }
+      return;
+    }
+    const ok = await copyText(text);
+    flash(ok ? 'Compartilhar não está disponível neste navegador: texto copiado, cole no mensageiro.' : 'Compartilhar não está disponível neste navegador.');
+  }
+
+  async function doWhatsApp(text){
+    const url = 'https://wa.me/?text=' + encodeURIComponent(text);
+    if (url.length > 4000){
+      const ok = await copyText(text);
+      flash(ok ? 'Texto longo demais para o link do WhatsApp: copiado, cole na conversa.' : 'Texto longo demais para o link do WhatsApp.');
+      return;
+    }
+    window.open(url, '_blank', 'noopener');
+  }
+
+  async function doMail(text){
+    const url = 'mailto:?subject=' + encodeURIComponent('Delineamento — área a pintar') + '&body=' + encodeURIComponent(text);
+    if (url.length > 1900){
+      const ok = await copyText(text);
+      flash(ok ? 'Texto longo para o link de e-mail: copiado, cole no corpo da mensagem.' : 'Texto longo demais para o link de e-mail.');
+      return;
+    }
+    location.href = url;
+  }
+
+  function download(blob, name){
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a'); a.href = url; a.download = name;
+    document.body.append(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+  }
+  function fileStamp(){
+    const d = new Date(), p = n => String(n).padStart(2, '0');
+    return d.getFullYear() + p(d.getMonth() + 1) + p(d.getDate()) + '-' + p(d.getHours()) + p(d.getMinutes());
+  }
+  function histEntries(){ return hist.slice().reverse(); } // do mais antigo ao mais recente
+
+  function exportXlsx(){
+    if (!hist.length) return;
+    download(new Blob([buildXlsxBytes(histEntries())], {type: XLSX_MIME}), 'delineamento-' + fileStamp() + '.xlsx');
+  }
+  function exportTxt(){
+    if (!hist.length) return;
+    download(new Blob(['﻿' + buildText(histEntries())], {type: 'text/plain;charset=utf-8'}), 'delineamento-' + fileStamp() + '.txt');
+  }
+
+  function renderHist(){
+    const box = $('hist'); box.innerHTML = '';
+    hist.forEach((e, i) => {
+      const row = document.createElement('div'); row.className = 'hist-item';
+      const left = document.createElement('div');
+      const t = document.createElement('b'); t.textContent = (e.ref || e.desc || e.type) + ' — ' + nf(e.area) + ' m²';
+      const s = document.createElement('span');
+      s.textContent = e.type + (e.qtd > 1 ? ' × ' + e.qtd : '') + (e.desc && e.ref ? ' · ' + e.desc : '') + (e.litros != null ? ' · ' + nf(e.litros) + ' L' : '');
+      left.append(t, s);
+      const del = document.createElement('button'); del.className = 'small'; del.type = 'button'; del.textContent = 'Remover';
+      del.addEventListener('click', () => { hist.splice(i, 1); saveHist(); renderHist(); });
+      row.append(left, del); box.append(row);
+    });
+    const has = hist.length > 0;
+    $('total').classList.toggle('hidden', !has);
+    $('histActions').classList.toggle('hidden', !has);
+    $('histEmpty').classList.toggle('hidden', has);
+    $('totalVal').textContent = nf(hist.reduce((s, e) => s + e.area, 0)) + ' m²';
+  }
+
+  function pickType(k){ type = k; initVals(); renderFields(); showError(''); $('res').classList.add('hidden'); }
+  function pickUnit(u){ unit = u; renderFields(); }
+
+  buildChips($('types'), 'type', Object.keys(TYPES).map(k => [k, TYPES[k].label]), type, pickType);
+  buildChips($('units'), 'unit', Object.keys(UNITS).map(k => [k, UNITS[k].label]), unit, pickUnit);
+
+  $('go').addEventListener('click', calculate);
+  document.addEventListener('keydown', ev => { if (ev.key === 'Enter' && ev.target.tagName === 'INPUT' && ev.target.type === 'text') calculate(); });
+  $('add').addEventListener('click', () => { if (!last) return; hist.unshift(last); saveHist(); renderHist(); last = null; $('res').classList.add('hidden'); });
+  $('copy').addEventListener('click', () => { if (last) doCopy(buildText([last], last.ts)); });
+  $('shareRes').addEventListener('click', () => { if (last) doShare(buildText([last], last.ts)); });
+  $('waRes').addEventListener('click', () => { if (last) doWhatsApp(buildText([last], last.ts)); });
+  $('xlsx').addEventListener('click', exportXlsx);
+  $('hCopy').addEventListener('click', () => { if (hist.length) doCopy(buildText(histEntries())); });
+  $('hShare').addEventListener('click', () => { if (hist.length) doShare(buildText(histEntries())); });
+  $('hWa').addEventListener('click', () => { if (hist.length) doWhatsApp(buildText(histEntries())); });
+  $('hMail').addEventListener('click', () => { if (hist.length) doMail(buildText(histEntries())); });
+  $('hTxt').addEventListener('click', exportTxt);
+  $('clear').addEventListener('click', () => { if (confirm('Apagar todo o histórico?')) { hist = []; saveHist(); renderHist(); } });
+
+  initVals(); renderFields(); renderHist();
+})();
+</script>
+
+<script>
+/* ---------- PWA: service worker e instalação ---------- */
+(function(){
+  if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.hostname === 'localhost')) {
+    window.addEventListener('load', function(){ navigator.serviceWorker.register('sw.js').catch(function(){}); });
+  }
+  var box = document.getElementById('installBox');
+  var btn = document.getElementById('installBtn');
+  var msg = document.getElementById('installMsg');
+  var closed = false;
+  try { closed = localStorage.getItem('delineamento-install-closed') === '1'; } catch(e){}
+  var standalone = window.matchMedia('(display-mode: standalone)').matches || navigator.standalone === true;
+  if (standalone || closed) return;
+  var deferred = null;
+  window.addEventListener('beforeinstallprompt', function(e){
+    e.preventDefault(); deferred = e;
+    btn.classList.remove('hidden'); box.classList.remove('hidden');
+  });
+  btn.addEventListener('click', function(){
+    if (!deferred) return;
+    deferred.prompt();
+    deferred.userChoice.finally(function(){ deferred = null; box.classList.add('hidden'); });
+  });
+  window.addEventListener('appinstalled', function(){ box.classList.add('hidden'); });
+  var ios = /iphone|ipad|ipod/i.test(navigator.userAgent);
+  if (ios) {
+    msg.textContent = 'No iPhone/iPad: toque em Compartilhar e depois em "Adicionar à Tela de Início".';
+    box.classList.remove('hidden');
+  }
+  document.getElementById('installClose').addEventListener('click', function(){
+    box.classList.add('hidden');
+    try { localStorage.setItem('delineamento-install-closed', '1'); } catch(e){}
+  });
+})();
+</script>
+</body>
+</html>

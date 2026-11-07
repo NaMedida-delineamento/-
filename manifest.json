@@ -1,6 +1,6 @@
 {
-  "name": "Calculadora de Delineamento",
-  "short_name": "Delineamento",
+  "name": "NaMedida - Delineamento",
+  "short_name": "NaMedida",
   "description": "Cálculo de área de superfície a pintar por elemento: tubo, perfil, viga, chapa, cantoneira, tanque e desenvolvimento linear.",
   "lang": "pt-BR",
   "start_url": "./",

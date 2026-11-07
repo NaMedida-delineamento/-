@@ -56,6 +56,10 @@
   .kv{display:flex;justify-content:space-between;gap:12px;padding:6px 0;border-bottom:1px dashed var(--line)}
   .kv:last-child{border-bottom:0}
   .row-actions{display:flex;flex-wrap:wrap;gap:8px;margin-top:14px}
+  .modo{border:1px solid var(--line);border-radius:10px;padding:8px 12px 10px;margin:14px 0 0;background:var(--card)}
+  .modo legend{font-size:.85rem;font-weight:600;color:var(--muted);padding:0 6px}
+  .modo label{display:inline-flex;align-items:center;gap:8px;margin:2px 16px 2px 0;cursor:pointer}
+  .modo input{width:20px;height:20px;accent-color:var(--accent)}
   .hist-item{border:1px solid var(--line);border-radius:10px;padding:10px 12px;margin-top:10px;display:flex;justify-content:space-between;gap:10px;align-items:flex-start}
   .hist-item b{display:block}
   .hist-item span{color:var(--muted);font-size:.85rem}
@@ -129,9 +133,15 @@
     <div class="big" id="resArea"></div>
     <p class="formula" id="resFormula"></p>
     <div id="resExtra" style="margin-top:12px"></div>
+    <fieldset class="modo">
+      <legend>Texto a enviar</legend>
+      <label><input class="modoRadio" type="radio" name="modoTextoRes" value="jateada"> Superfície Jateada</label>
+      <label><input class="modoRadio" type="radio" name="modoTextoRes" value="pintada"> Estrutura Pintada</label>
+    </fieldset>
     <div class="row-actions">
       <button type="button" id="add">Adicionar ao histórico</button>
       <button type="button" id="copy">Copiar texto</button>
+      <button type="button" id="pdfRes">Exportar PDF</button>
       <button type="button" id="shareRes">Compartilhar</button>
       <button type="button" id="waRes">WhatsApp</button>
     </div>
@@ -141,8 +151,16 @@
     <strong>Histórico</strong>
     <div id="hist"></div>
     <div class="total hidden" id="total"><span>Área total</span><span id="totalVal"></span></div>
+    <div class="hidden" id="histModo">
+    <fieldset class="modo">
+      <legend>Texto a enviar</legend>
+      <label><input class="modoRadio" type="radio" name="modoTextoHist" value="jateada"> Superfície Jateada</label>
+      <label><input class="modoRadio" type="radio" name="modoTextoHist" value="pintada"> Estrutura Pintada</label>
+    </fieldset>
+    </div>
     <div class="row-actions hidden" id="histActions">
       <button type="button" id="xlsx">Exportar Excel (.xlsx)</button>
+      <button type="button" id="hPdf">Exportar PDF</button>
       <button type="button" id="hCopy">Copiar texto</button>
       <button type="button" id="hShare">Compartilhar</button>
       <button type="button" id="hWa">WhatsApp</button>
@@ -341,11 +359,14 @@ function entryBlock(e, idx){
   return lines.join('\n');
 }
 
+let modoTexto = 'pintada'; // 'pintada' | 'jateada'
+try { if (localStorage.getItem('delineamento-modo-texto') === 'jateada') modoTexto = 'jateada'; } catch(e){}
+
 function buildText(entries, when){
   const d = when ? new Date(when) : new Date();
   const p = n => String(n).padStart(2, '0');
   const stamp = p(d.getDate()) + '/' + p(d.getMonth() + 1) + '/' + d.getFullYear() + ' ' + p(d.getHours()) + ':' + p(d.getMinutes());
-  const head = 'DELINEAMENTO — área de superfície a pintar\n' + stamp;
+  const head = 'DELINEAMENTO — Área de superfície ' + (modoTexto === 'jateada' ? 'Jateada' : 'Pintada') + '\n' + stamp;
   if (entries.length === 1) return head + '\n\n' + entryBlock(entries[0], 0);
   const body = entries.map((e, i) => entryBlock(e, i + 1)).join('\n\n');
   const total = entries.reduce((s, e) => s + e.area, 0);
@@ -483,6 +504,218 @@ function buildXlsxBytes(entries){
     {name: 'xl/styles.xml', data: XLSX_STYLES},
     {name: 'xl/worksheets/sheet1.xml', data: xlsxSheetXml(entries)}
   ]);
+}
+
+/* ----- PDF (gerador mínimo: fonte Helvetica padrão do PDF, sem dependências, funciona offline) ----- */
+const PDF_WR = [278,278,355,556,556,889,667,191,333,333,389,584,278,333,278,278]
+  .concat(Array(10).fill(556), [278,278,584,584,584,556,1015],
+    [667,667,722,722,667,611,778,722,278,500,667,556,833,722,778,667,778,722,667,611,722,667,944,667,667,611],
+    [278,278,278,469,556,333],
+    [556,556,500,556,556,278,556,556,222,222,500,222,833,556,556,556,556,333,500,278,556,500,722,500,500,500],
+    [334,260,334,584]);
+const PDF_WB = [278,333,474,556,556,889,722,238,333,333,389,584,278,333,278,278]
+  .concat(Array(10).fill(556), [333,333,584,584,584,611,975],
+    [722,722,722,722,667,611,778,722,278,556,722,611,833,722,778,667,778,722,667,611,722,667,944,667,667,611],
+    [333,278,333,584,556,333],
+    [556,611,556,611,556,333,611,611,278,278,556,278,889,611,611,611,611,389,556,333,611,556,778,556,556,500],
+    [389,280,389,584]);
+const PDF_EXTRA = {'\u2014':1000,'\u2013':556,'\u00D7':584,'\u00B7':278,'\u00B2':333,'\u00B3':333,'\u00BA':365,'\u00AA':370,'\u00B0':400,'\u2022':350};
+
+function pdfCharW(ch, bold){
+  if (PDF_EXTRA[ch] != null) return PDF_EXTRA[ch];
+  let c = ch.charCodeAt(0);
+  if (c < 32 || c > 126){
+    const base = ch.normalize('NFD').charCodeAt(0);
+    c = (base >= 32 && base <= 126) ? base : 0;
+    if (!c) return 556;
+  }
+  return (bold ? PDF_WB : PDF_WR)[c - 32];
+}
+function pdfTextW(s, bold, size){
+  let t = 0; for (const ch of String(s)) t += pdfCharW(ch, bold);
+  return t * size / 1000;
+}
+function pdfWrap(text, maxW, bold, size){
+  const out = [];
+  String(text).split('\n').forEach(par => {
+    let line = '';
+    par.split(' ').forEach(word => {
+      let cand = line ? line + ' ' + word : word;
+      if (pdfTextW(cand, bold, size) <= maxW){ line = cand; return; }
+      if (line){ out.push(line); line = ''; }
+      // palavra maior que a coluna: quebra por caractere
+      while (pdfTextW(word, bold, size) > maxW && word.length > 1){
+        let k = 1;
+        while (k < word.length && pdfTextW(word.slice(0, k + 1), bold, size) <= maxW) k++;
+        out.push(word.slice(0, k)); word = word.slice(k);
+      }
+      line = word;
+    });
+    out.push(line);
+  });
+  return out;
+}
+function pdfHex(s){
+  const map = {0x2014:0x97,0x2013:0x96,0x2019:0x92,0x2018:0x91,0x201C:0x93,0x201D:0x94,0x2022:0x95};
+  let h = '';
+  for (const ch of String(s)){
+    const cp = ch.codePointAt(0);
+    const b = map[cp] != null ? map[cp] : (cp < 256 ? cp : 0x3F);
+    h += (b < 16 ? '0' : '') + b.toString(16);
+  }
+  return h.toUpperCase();
+}
+
+function buildPdfBytes(entries, when, modo){
+  const W = 595.28, H = 841.89, M = 40, CW = W - 2 * M;
+  const ACC = [0.043,0.431,0.541], SOFT = [0.882,0.945,0.965], ZEBRA = [0.965,0.972,0.98];
+  const INK = [0.078,0.125,0.169], MUT = [0.361,0.42,0.478], LINE = [0.835,0.867,0.898], WHITE = [1,1,1];
+  const modoTxt = modo === 'jateada' ? 'Jateada' : 'Pintada';
+  const d = when ? new Date(when) : new Date();
+  const p2 = n => String(n).padStart(2, '0');
+  const stamp = p2(d.getDate()) + '/' + p2(d.getMonth() + 1) + '/' + d.getFullYear() + ' ' + p2(d.getHours()) + ':' + p2(d.getMinutes());
+
+  const f = n => String(Math.round(n * 100) / 100);
+  const col = c => c.map(f).join(' ');
+  const pages = []; let ops, y;
+  const rect = (x, top, w, h, c) => ops.push(col(c) + ' rg ' + f(x) + ' ' + f(H - top - h) + ' ' + f(w) + ' ' + f(h) + ' re f');
+  const hline = (x1, x2, top, c, lw) => ops.push(col(c) + ' RG ' + f(lw) + ' w ' + f(x1) + ' ' + f(H - top) + ' m ' + f(x2) + ' ' + f(H - top) + ' l S');
+  const text = (s, x, baseTop, size, bold, c, align) => {
+    // o "²" é desenhado como um "2" pequeno e elevado, para não depender do glifo da fonte do leitor de PDF
+    let xx = align === 'r' ? x - pdfTextW(s, bold, size) : x;
+    const parts = String(s).split('\u00B2');
+    const put = (str, px, py, sz) => ops.push('BT ' + col(c) + ' rg /' + (bold ? 'F2' : 'F1') + ' ' + f(sz) + ' Tf ' + f(px) + ' ' + f(py) + ' Td <' + pdfHex(str) + '> Tj ET');
+    parts.forEach((part, i) => {
+      if (part){ put(part, xx, H - baseTop, size); xx += pdfTextW(part, bold, size); }
+      if (i < parts.length - 1){ put('2', xx, H - baseTop + size * 0.36, size * 0.62); xx += pdfTextW('\u00B2', bold, size); }
+    });
+  };
+
+  const cols = [
+    {key:'n',    label:'#',                   w:24,  align:'l'},
+    {key:'item', label:'Referência',          w:130, align:'l'},
+    {key:'elem', label:'Elemento',            w:100, align:'l'},
+    {key:'dims', label:'Medidas',             w:135, align:'l'},
+    {key:'area', label:'Área (m²)',           w:66,  align:'r'},
+    {key:'tint', label:'Tinta (L)',           w:60,  align:'r'}
+  ];
+  let cx = M; cols.forEach(c => { c.x = cx; cx += c.w; });
+  const PADX = 6, FS = 9, LH = 12;
+
+  function newPage(first){
+    ops = []; pages.push(ops);
+    if (first){
+      rect(0, 0, W, 84, ACC);
+      text('DELINEAMENTO', M, 40, 22, true, WHITE);
+      text('Área de superfície ' + modoTxt, M, 60, 12, false, WHITE);
+      text(stamp, W - M, 40, 10, true, WHITE, 'r');
+      text(entries.length + (entries.length === 1 ? ' elemento' : ' elementos'), W - M, 60, 10, false, WHITE, 'r');
+      y = 106;
+    } else {
+      rect(0, 0, W, 28, ACC);
+      text('DELINEAMENTO — Área de superfície ' + modoTxt, M, 18, 9, true, WHITE);
+      text(stamp, W - M, 18, 9, false, WHITE, 'r');
+      y = 48;
+    }
+  }
+  function tableHeader(){
+    rect(M, y, CW, 22, ACC);
+    cols.forEach(c => text(c.label, c.align === 'r' ? c.x + c.w - PADX : c.x + PADX, y + 14.5, 8.5, true, WHITE, c.align));
+    y += 22;
+  }
+
+  const total = entries.reduce((s, e) => s + e.area, 0);
+  const comTinta = entries.filter(e => e.litros != null);
+  const totalL = comTinta.reduce((s, e) => s + e.litros, 0);
+
+  newPage(true);
+
+  // cartões-resumo
+  const bw = (CW - 20) / 3, bh = 54;
+  [
+    ['ELEMENTOS', String(entries.length)],
+    ['ÁREA TOTAL', fmtN(total) + ' m²'],
+    ['TINTA TOTAL (COM PERDAS)', comTinta.length ? fmtN(totalL) + ' L' : '—']
+  ].forEach((b, i) => {
+    const x = M + i * (bw + 10);
+    rect(x, y, bw, bh, SOFT);
+    rect(x, y, 3, bh, ACC);
+    text(b[0], x + 14, y + 19, 7.5, true, MUT);
+    text(b[1], x + 14, y + 41, 16, true, INK);
+  });
+  y += bh + 24;
+
+  tableHeader();
+
+  entries.forEach((e, i) => {
+    const title = [e.ref, e.desc].filter(Boolean).join(' — ') || 'Sem referência';
+    const cell = {
+      n: [String(i + 1)],
+      item: pdfWrap(title, cols[1].w - 2 * PADX, true, FS),
+      elem: pdfWrap(e.type + (e.qtd > 1 ? '\n× ' + e.qtd + ' peças (' + fmtN(e.unitArea) + ' m² por peça)' : ''), cols[2].w - 2 * PADX, false, FS),
+      dims: pdfWrap(e.dims || '—', cols[3].w - 2 * PADX, false, FS),
+      area: [fmtN(e.area)],
+      tint: [e.litros != null ? fmtN(e.litros) : '—']
+    };
+    const lines = Math.max.apply(null, cols.map(c => cell[c.key].length));
+    const rh = lines * LH + 10;
+    if (y + rh > H - 60){ newPage(false); tableHeader(); }
+    if (i % 2) rect(M, y, CW, rh, ZEBRA);
+    cols.forEach(c => {
+      const bold = c.key === 'item' || c.key === 'area';
+      cell[c.key].forEach((ln, k) => text(ln, c.align === 'r' ? c.x + c.w - PADX : c.x + PADX, y + 5 + FS + k * LH - 1, FS, bold, c.key === 'n' ? MUT : INK, c.align));
+    });
+    hline(M, M + CW, y + rh, LINE, 0.5);
+    y += rh;
+  });
+
+  // total
+  if (y + 30 > H - 60){ newPage(false); tableHeader(); }
+  rect(M, y, CW, 28, SOFT);
+  hline(M, M + CW, y, ACC, 1.5);
+  text('TOTAL', cols[1].x + PADX, y + 18, 10, true, INK);
+  text(fmtN(total), cols[4].x + cols[4].w - PADX, y + 18, 10, true, ACC, 'r');
+  text(comTinta.length ? fmtN(totalL) : '—', cols[5].x + cols[5].w - PADX, y + 18, 10, true, ACC, 'r');
+  y += 28 + 14;
+
+  const nota = comTinta.length === 0 ? '' :
+    (comTinta.length < entries.length ? 'Tinta total considera somente os itens com consumo informado. ' : '') + 'Consumo de tinta já inclui perdas.';
+  if (nota){
+    if (y + 12 > H - 60) newPage(false);
+    text(nota, M, y + 8, 8, false, MUT);
+  }
+
+  // rodapé com paginação
+  pages.forEach((po, idx) => {
+    ops = po;
+    hline(M, M + CW, H - 40, LINE, 0.5);
+    text('NaMedida — Delineamento', M, H - 26, 8, false, MUT);
+    text('Página ' + (idx + 1) + ' de ' + pages.length, W - M, H - 26, 8, false, MUT, 'r');
+  });
+
+  // montagem do arquivo
+  const P = pages.length;
+  let out = '%PDF-1.4\n'; const off = [];
+  const add = (id, body) => { off[id] = out.length; out += id + ' 0 obj\n' + body + '\nendobj\n'; };
+  const kids = pages.map((_, i) => (6 + 2 * i) + ' 0 R').join(' ');
+  add(1, '<< /Type /Catalog /Pages 2 0 R >>');
+  add(2, '<< /Type /Pages /Kids [' + kids + '] /Count ' + P + ' >>');
+  add(3, '<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >>');
+  add(4, '<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold /Encoding /WinAnsiEncoding >>');
+  pages.forEach((po, i) => {
+    const content = po.join('\n');
+    add(5 + 2 * i, '<< /Length ' + content.length + ' >>\nstream\n' + content + '\nendstream');
+    add(6 + 2 * i, '<< /Type /Page /Parent 2 0 R /MediaBox [0 0 ' + W + ' ' + H + '] /Resources << /Font << /F1 3 0 R /F2 4 0 R >> >> /Contents ' + (5 + 2 * i) + ' 0 R >>');
+  });
+  const infoId = 5 + 2 * P, count = infoId + 1;
+  add(infoId, '<< /Title (Delineamento) /Producer (NaMedida) >>');
+  const xref = out.length;
+  out += 'xref\n0 ' + count + '\n0000000000 65535 f \n';
+  for (let id = 1; id < count; id++) out += String(off[id]).padStart(10, '0') + ' 00000 n \n';
+  out += 'trailer\n<< /Size ' + count + ' /Root 1 0 R /Info ' + infoId + ' 0 R >>\nstartxref\n' + xref + '\n%%EOF';
+  const bytes = new Uint8Array(out.length);
+  for (let i = 0; i < out.length; i++) bytes[i] = out.charCodeAt(i) & 255;
+  return bytes;
 }
 /*EXPORT-END*/
 
@@ -691,6 +924,19 @@ function buildXlsxBytes(entries){
     if (!hist.length) return;
     download(new Blob([buildXlsxBytes(histEntries())], {type: XLSX_MIME}), 'delineamento-' + fileStamp() + '.xlsx');
   }
+  async function doPdf(entries, when){
+    const bytes = buildPdfBytes(entries, when, modoTexto);
+    const name = 'delineamento-' + modoTexto + '-' + fileStamp() + '.pdf';
+    const blob = new Blob([bytes], {type: 'application/pdf'});
+    try {
+      // no celular, abre a folha de compartilhamento (salvar em Arquivos, WhatsApp, etc.)
+      if (window.matchMedia('(pointer:coarse)').matches && navigator.canShare){
+        const file = new File([blob], name, {type: 'application/pdf'});
+        if (navigator.canShare({files: [file]})){ await navigator.share({files: [file], title: 'Delineamento'}); return; }
+      }
+    } catch(e){ if (e && e.name === 'AbortError') return; }
+    download(blob, name);
+  }
   function exportTxt(){
     if (!hist.length) return;
     download(new Blob(['﻿' + buildText(histEntries())], {type: 'text/plain;charset=utf-8'}), 'delineamento-' + fileStamp() + '.txt');
@@ -712,6 +958,7 @@ function buildXlsxBytes(entries){
     const has = hist.length > 0;
     $('total').classList.toggle('hidden', !has);
     $('histActions').classList.toggle('hidden', !has);
+    $('histModo').classList.toggle('hidden', !has);
     $('histEmpty').classList.toggle('hidden', has);
     $('totalVal').textContent = nf(hist.reduce((s, e) => s + e.area, 0)) + ' m²';
   }
@@ -729,12 +976,24 @@ function buildXlsxBytes(entries){
   $('shareRes').addEventListener('click', () => { if (last) doShare(buildText([last], last.ts)); });
   $('waRes').addEventListener('click', () => { if (last) doWhatsApp(buildText([last], last.ts)); });
   $('xlsx').addEventListener('click', exportXlsx);
+  $('pdfRes').addEventListener('click', () => { if (last) doPdf([last], last.ts); });
+  $('hPdf').addEventListener('click', () => { if (hist.length) doPdf(histEntries()); });
   $('hCopy').addEventListener('click', () => { if (hist.length) doCopy(buildText(histEntries())); });
   $('hShare').addEventListener('click', () => { if (hist.length) doShare(buildText(histEntries())); });
   $('hWa').addEventListener('click', () => { if (hist.length) doWhatsApp(buildText(histEntries())); });
   $('hMail').addEventListener('click', () => { if (hist.length) doMail(buildText(histEntries())); });
   $('hTxt').addEventListener('click', exportTxt);
   $('clear').addEventListener('click', () => { if (confirm('Apagar todo o histórico?')) { hist = []; saveHist(); renderHist(); } });
+
+  function syncModo(){
+    document.querySelectorAll('input.modoRadio').forEach(r => { r.checked = (r.value === modoTexto); });
+  }
+  document.querySelectorAll('input.modoRadio').forEach(r => r.addEventListener('change', () => {
+    if (!r.checked) return;
+    modoTexto = r.value; syncModo();
+    try { localStorage.setItem('delineamento-modo-texto', modoTexto); } catch(e){}
+  }));
+  syncModo();
 
   initVals(); renderFields(); renderHist();
 })();

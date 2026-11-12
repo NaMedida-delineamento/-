@@ -15,15 +15,18 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <style>
   :root{
-    --bg:#f4f6f8; --card:#ffffff; --ink:#14202b; --muted:#5c6b7a; --line:#d5dde5;
-    --accent:#0b6e8a; --accent-ink:#ffffff; --accent-soft:#e1f1f6; --warn:#b3261e; --ok:#1b7a43;
-  }
-  @media (prefers-color-scheme: dark){
-    :root{
-      --bg:#0f161c; --card:#17212a; --ink:#e8eef3; --muted:#93a3b2; --line:#2a3946;
-      --accent:#3cb4d3; --accent-ink:#06222b; --accent-soft:#143440; --warn:#ff8a80; --ok:#6fd49a;
-    }
-  }
+  color-scheme: dark;
+  --bg:#0a0a0a;          /* fundo da página */
+  --card:#171717;        /* cards, cinza bem escuro */
+  --ink:#f2f2f2;         /* texto principal */
+  --muted:#a3a3a3;       /* texto secundário */
+  --line:#3a3a3a;        /* bordas em cinza escuro */
+  --accent:#dc8f43;      /* laranja principal */
+  --accent-ink:#141414;  /* texto sobre o laranja */
+  --accent-soft:#242424; /* fundo do resultado e do aviso de instalação */
+  --warn:#ff8a80;
+  --ok:#6fd49a;
+}
   *{box-sizing:border-box}
   body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
   main{max-width:760px;margin:0 auto;padding:20px 16px 60px}
@@ -76,7 +79,7 @@
 <body>
 <main>
   <h1>NaMedida - Delineamento</h1>
-  <p class="sub">Área de superfície a pintar por elemento. Resultados em m².</p>
+  <p class="sub">Developer by Pedro Santos.</p>
 
   <div id="installBox" class="hidden">
     <span id="installMsg">Instale como app para abrir direto da tela inicial e usar offline.</span>
@@ -568,8 +571,8 @@ function pdfHex(s){
 
 function buildPdfBytes(entries, when, modo){
   const W = 595.28, H = 841.89, M = 40, CW = W - 2 * M;
-  const ACC = [0.043,0.431,0.541], SOFT = [0.882,0.945,0.965], ZEBRA = [0.965,0.972,0.98];
-  const INK = [0.078,0.125,0.169], MUT = [0.361,0.42,0.478], LINE = [0.835,0.867,0.898], WHITE = [1,1,1];
+  const ACC = [0.20,0.20,0.20], SOFT = [0.92,0.92,0.92], ZEBRA = [0.97,0.97,0.97];
+  const INK = [0,0,0], MUT = [0.40,0.40,0.40], LINE = [0.80,0.80,0.80], WHITE = [1,1,1];
   const modoTxt = modo === 'jateada' ? 'Jateada' : 'Pintada';
   const d = when ? new Date(when) : new Date();
   const p2 = n => String(n).padStart(2, '0');
@@ -635,7 +638,7 @@ function buildPdfBytes(entries, when, modo){
   [
     ['ELEMENTOS', String(entries.length)],
     ['ÁREA TOTAL', fmtN(total) + ' m²'],
-    ['TINTA TOTAL (COM PERDAS)', comTinta.length ? fmtN(totalL) + ' L' : '—']
+    ['TINTA TOTAL (APROXIMADAMENTE)', comTinta.length ? fmtN(totalL) + ' L' : '—']
   ].forEach((b, i) => {
     const x = M + i * (bw + 10);
     rect(x, y, bw, bh, SOFT);

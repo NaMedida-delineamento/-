@@ -417,7 +417,7 @@ const TYPES = {
       {id:'b', label:'Largura da mesa (b)', kind:'len', ph:0.2},
       {id:'tw', label:'Espessura da alma (tw)', kind:'len', ph:0.008},
       {id:'l', label:'Comprimento', kind:'len', ph:8},
-      {id:'laje', label:'Mesa superior em contato com laje (não pintar a face de cima)', kind:'check'}
+      {id:'laje', label:'Mesa superior em contato com laje (não pintar/jatear a face de cima)', kind:'check'}
     ],
     calc(v){
       if (missing(v, ['h','b','tw','l'])) return {error:'Preencha todos os campos com valores maiores que zero.'};

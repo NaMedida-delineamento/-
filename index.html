@@ -180,6 +180,12 @@ button.primary:hover{color:var(--on-metal);filter:brightness(1.06)}
 
 /* ---------- instalação e avisos ---------- */
 #installBox{display:flex;flex-wrap:wrap;align-items:center;gap:10px;margin:0 0 16px;padding:12px 14px;border:1px dashed var(--accent);border-radius:12px;background:var(--accent-soft);font-size:.9rem}
+#editBanner{display:flex;flex-wrap:wrap;align-items:center;gap:10px;margin:0 0 16px;padding:12px 14px;border:1px solid var(--accent);border-radius:12px;background:var(--accent-soft);font-size:.92rem}
+#editBanner b{color:var(--accent-2)}
+#editBanner button{margin-left:auto}
+.hist-item .acts{display:flex;gap:6px;flex:none}
+.hist-item button.edit{color:var(--accent-2)}
+.hist-item button.edit:hover{border-color:var(--accent);color:var(--accent-2);background:var(--accent-soft)}
 #installBox button{background:var(--accent);color:#fff;border-color:var(--accent)}
 #installBox .x{background:transparent;color:var(--muted);border-color:transparent;margin-left:auto}
 #toast{position:fixed;left:50%;bottom:calc(96px + env(safe-area-inset-bottom,0px));transform:translate(-50%,20px);background:#202126;color:var(--ink);border:1px solid var(--edge-2);
@@ -210,7 +216,7 @@ button.primary:hover{color:var(--on-metal);filter:brightness(1.06)}
     <img src="pngico.png" width="44" height="44" alt="NaMedida" style="display:block;flex:none;object-fit:contain">
     <div>
       <h1>NaMedida - Delineamento</h1>
-      <p class="sub">Developer by MISFITcorp.</p>
+      <p class="sub">Developer by Pedro Santos.</p>
     </div>
   </div>
   <span class="pill"><i></i>Área de superfície · m²</span>
@@ -223,6 +229,11 @@ button.primary:hover{color:var(--on-metal);filter:brightness(1.06)}
       <span id="installMsg">Instale como app para abrir direto da tela inicial e usar offline.</span>
       <button type="button" id="installBtn" class="hidden">Instalar app</button>
       <button type="button" class="small x" id="installClose" aria-label="Fechar">Fechar</button>
+    </div>
+
+    <div id="editBanner" class="hidden">
+      <span>Editando a peça: <b id="editName"></b></span>
+      <button type="button" class="small" id="editCancel">Cancelar edição</button>
     </div>
 
     <div class="panel-head">
@@ -417,7 +428,7 @@ const TYPES = {
       {id:'b', label:'Largura da mesa (b)', kind:'len', ph:0.2},
       {id:'tw', label:'Espessura da alma (tw)', kind:'len', ph:0.008},
       {id:'l', label:'Comprimento', kind:'len', ph:8},
-      {id:'laje', label:'Mesa superior em contato com laje (não pintar/jatear a face de cima)', kind:'check'}
+      {id:'laje', label:'Mesa superior em contato com laje (não pintar a face de cima)', kind:'check'}
     ],
     calc(v){
       if (missing(v, ['h','b','tw','l'])) return {error:'Preencha todos os campos com valores maiores que zero.'};
@@ -758,13 +769,40 @@ function buildPdfBytes(entries, when, modo){
     });
   };
 
+  // desenho vetorial da peça dentro de uma caixa (coordenadas do topo da página)
+  const pdfWire = (w2, bx, by, bw, bh) => {
+    const labH = w2.dim ? 11 : 0, pad = 4;
+    const dx = (w2.maxx - w2.minx) || 1, dy = (w2.maxy - w2.miny) || 1;
+    const aw = bw - 2 * pad, ah = bh - 2 * pad - labH;
+    const sc = Math.min(aw / dx, ah / dy);
+    const ox = bx + bw / 2 - (w2.minx + w2.maxx) / 2 * sc, oy = by + pad + ah / 2 + (w2.miny + w2.maxy) / 2 * sc;
+    const tx = v => ox + v * sc, tyy = v => oy - v * sc;
+    const mix = (c, a) => c.map(k => 1 - (1 - k) * a);
+    const seg = (x1, t1, x2, t2, c, lw) => ops.push(col(c) + ' RG ' + f(lw) + ' w ' + f(x1) + ' ' + f(H - t1) + ' m ' + f(x2) + ' ' + f(H - t2) + ' l S');
+    ops.push('1 J');
+    w2.lines.forEach(l => {
+      const a = Math.max(0.3, Math.min(1, l[5] + 0.25));
+      seg(tx(l[0]), tyy(l[1]), tx(l[2]), tyy(l[3]), l[4] ? mix(OR, a) : mix([0.16,0.16,0.16], a), 0.5);
+    });
+    if (w2.dim){
+      const dm = w2.dim, X1 = tx(dm.x1), Y1 = tyy(dm.y1), X2 = tx(dm.x2), Y2 = tyy(dm.y2);
+      ops.push('[3 2] 0 d');
+      seg(X1, Y1, X2, Y2, [0.85,0.42,0.04], 0.7);
+      ops.push('[] 0 d');
+      const lw = pdfTextW(dm.label, true, 6.5);
+      const cxm = Math.max(bx + lw / 2 + 1, Math.min(bx + bw - lw / 2 - 1, (X1 + X2) / 2));
+      text(dm.label, cxm - lw / 2, Math.min((Y1 + Y2) / 2 + 9, by + bh - 2), 6.5, true, [0.71,0.32,0]);
+    }
+  };
+
   const cols = [
-    {key:'n',    label:'#',                   w:24,  align:'l'},
-    {key:'item', label:'Referência',          w:130, align:'l'},
-    {key:'elem', label:'Elemento',            w:100, align:'l'},
-    {key:'dims', label:'Medidas',             w:135, align:'l'},
-    {key:'area', label:'Área (m²)',           w:66,  align:'r'},
-    {key:'tint', label:'Tinta (L)',           w:60,  align:'r'}
+    {key:'n',    label:'#',                   w:20,  align:'l'},
+    {key:'item', label:'Referência',          w:100, align:'l'},
+    {key:'elem', label:'Elemento',            w:78,  align:'l'},
+    {key:'dims', label:'Medidas',             w:112, align:'l'},
+    {key:'draw', label:'Desenho',             w:105, align:'l'},
+    {key:'area', label:'Área (m²)',           w:52,  align:'r'},
+    {key:'tint', label:'Tinta (L)',           w:48,  align:'r'}
   ];
   let cx = M; cols.forEach(c => { c.x = cx; cx += c.w; });
   const PADX = 6, FS = 9, LH = 12;
@@ -824,10 +862,12 @@ function buildPdfBytes(entries, when, modo){
       elem: pdfWrap((e.qtd > 1 ? e.qtd + 'x ' : '') + e.type + (e.qtd > 1 ? '\n(' + fmtN(e.unitArea) + ' m² por peça)' : ''), cols[2].w - 2 * PADX, false, FS),
       dims: pdfWrap(e.dims || '—', cols[3].w - 2 * PADX, false, FS),
       area: [fmtN(e.area)],
+      draw: [],
       tint: [e.litros != null ? fmtN(e.litros) : '—']
     };
+    const w2 = wireFor(e);
     const lines = Math.max.apply(null, cols.map(c => cell[c.key].length));
-    const rh = lines * LH + 10;
+    const rh = Math.max(lines * LH + 10, w2 ? 92 : 0);
     if (y + rh > H - 60){ newPage(false); tableHeader(); }
     if (i % 2) rect(M, y, CW, rh, ZEBRA);
     cols.forEach(c => {
@@ -841,6 +881,7 @@ function buildPdfBytes(entries, when, modo){
         } else text(ln, px, py, FS, bold, c.key === 'n' ? MUT : INK, c.align);
       });
     });
+    if (w2) pdfWire(w2, cols[4].x + 3, y + 3, cols[4].w - 6, rh - 6);
     hline(M, M + CW, y + rh, LINE, 0.5);
     y += rh;
   });
@@ -851,8 +892,8 @@ function buildPdfBytes(entries, when, modo){
   hline(M, M + CW, y, ACC, 1.5);
   rect(M, y + 26, CW, 2, OR);
   text('TOTAL', cols[1].x + PADX, y + 18, 10, true, INK);
-  text(fmtN(total), cols[4].x + cols[4].w - PADX, y + 18, 10, true, OR, 'r');
-  text(comTinta.length ? fmtN(totalL) : '—', cols[5].x + cols[5].w - PADX, y + 18, 10, true, OR, 'r');
+  text(fmtN(total), cols[5].x + cols[5].w - PADX, y + 18, 10, true, OR, 'r');
+  text(comTinta.length ? fmtN(totalL) : '—', cols[6].x + cols[6].w - PADX, y + 18, 10, true, OR, 'r');
   y += 28 + 14;
 
   const nota = comTinta.length === 0 ? '' :
@@ -1032,7 +1073,7 @@ function buildJpegBlob(entries, when, modo){
 (function(){
   if (typeof document === 'undefined') return;
   const $ = id => document.getElementById(id);
-  let type = 'tubo', unit = 'm', vals = {}, last = null, hist = [];
+  let type = 'tubo', unit = 'm', vals = {}, last = null, hist = [], editIdx = null;
   const KEY = 'delineamento-historico-v1';
 
   try { hist = JSON.parse(localStorage.getItem(KEY) || '[]'); if (!Array.isArray(hist)) hist = []; } catch(e){ hist = []; }
@@ -1129,8 +1170,10 @@ function buildJpegBlob(entries, when, modo){
       type: TYPES[type].label, typeKey: type, unit, unitLabel: UNITS[unit].label, vals: Object.assign({}, vals),
       qtd, unitArea: r.area, area: total,
       litros: vol ? vol.real : null,
+      tinta: {dft: $('dft').value, sv: $('sv').value, perda: $('perda').value},
       dims: describeDims()
     };
+    $('add').textContent = editIdx != null ? 'Salvar alterações' : 'Adicionar ao histórico';
 
     $('resArea').innerHTML = nf(total) + ' <small>m²</small>';
     $('resFormula').textContent = r.formula + (qtd > 1 ? '   ×  ' + qtd + ' peças' : '');
@@ -1274,8 +1317,11 @@ function buildJpegBlob(entries, when, modo){
       s.textContent = (e.qtd > 1 ? e.qtd + 'x ' : '') + e.type + (e.desc && e.ref ? ' · ' + e.desc : '') + (e.litros != null ? ' · ' + nf(e.litros) + ' L' : '');
       left.append(t, s);
       const del = document.createElement('button'); del.className = 'small'; del.type = 'button'; del.textContent = 'Remover';
-      del.addEventListener('click', () => { hist.splice(i, 1); saveHist(); renderHist(); });
-      row.append(left, del); box.append(row);
+      del.addEventListener('click', () => { cancelEdit(); hist.splice(i, 1); saveHist(); renderHist(); });
+      const ed = document.createElement('button'); ed.className = 'small edit'; ed.type = 'button'; ed.textContent = 'Editar';
+      ed.addEventListener('click', () => editEntry(i));
+      const acts = document.createElement('div'); acts.className = 'acts'; acts.append(ed, del);
+      row.append(left, acts); box.append(row);
     });
     const has = hist.length > 0;
     $('total').classList.toggle('hidden', !has);
@@ -1283,6 +1329,33 @@ function buildJpegBlob(entries, when, modo){
     $('histModo').classList.toggle('hidden', !has);
     $('histEmpty').classList.toggle('hidden', has);
     $('totalVal').textContent = nf(hist.reduce((s, e) => s + e.area, 0)) + ' m²';
+  }
+
+  function cancelEdit(){
+    editIdx = null; $('editBanner').classList.add('hidden'); $('add').textContent = 'Adicionar ao histórico';
+  }
+  function editEntry(i){
+    const e = restoreEntry(hist[i]);
+    if (!e || !e.typeKey || !e.vals){ flash('Não foi possível abrir esta peça para edição.'); return; }
+    type = e.typeKey;
+    unit = Object.keys(UNITS).find(k => UNITS[k].label === e.unitLabel) || 'm';
+    initVals();
+    Object.keys(e.vals).forEach(k => { if (e.vals[k] !== undefined) vals[k] = e.vals[k]; });
+    buildChips($('types'), 'type', Object.keys(TYPES).map(k => [k, TYPES[k].label]), type, pickType);
+    buildChips($('units'), 'unit', Object.keys(UNITS).map(k => [k, UNITS[k].label]), unit, pickUnit);
+    renderFields();
+    $('qtd').value = e.qtd; $('ref').value = e.ref || ''; $('desc').value = e.desc || '';
+    const t = e.tinta || {};
+    $('dft').value = t.dft || ''; $('sv').value = t.sv || ''; $('perda').value = t.perda || '';
+    const det = document.querySelector('details'); if (det) det.open = !!(t.dft || t.sv || t.perda);
+    showError(''); $('res').classList.add('hidden'); last = null;
+    editIdx = i;
+    $('editName').textContent = [e.ref, e.desc].filter(Boolean).join(' — ') || e.type;
+    $('editBanner').classList.remove('hidden');
+    $('add').textContent = 'Salvar alterações';
+    $('t-par').scrollIntoView({behavior:'smooth', block:'start'});
+    if (e.litros != null && !e.tinta){ if (det) det.open = true; flash('Altere o que precisar e toque em Calcular. Informe os dados de tinta para manter o consumo.'); }
+    else flash('Altere o que precisar e toque em Calcular, depois em Salvar alterações.');
   }
 
   function pickType(k){ type = k; initVals(); renderFields(); showError(''); $('res').classList.add('hidden'); }
@@ -1293,7 +1366,13 @@ function buildJpegBlob(entries, when, modo){
 
   $('go').addEventListener('click', calculate);
   document.addEventListener('keydown', ev => { if (ev.key === 'Enter' && ev.target.tagName === 'INPUT' && ev.target.type === 'text') calculate(); });
-  $('add').addEventListener('click', () => { if (!last) return; hist.unshift(last); saveHist(); renderHist(); last = null; $('res').classList.add('hidden'); });
+  $('add').addEventListener('click', () => {
+    if (!last) return;
+    if (editIdx != null && hist[editIdx]){ last.ts = hist[editIdx].ts; hist[editIdx] = last; cancelEdit(); flash('Alterações salvas.'); }
+    else hist.unshift(last);
+    saveHist(); renderHist(); last = null; $('res').classList.add('hidden');
+  });
+  $('editCancel').addEventListener('click', () => { cancelEdit(); $('res').classList.add('hidden'); last = null; });
   $('copy').addEventListener('click', () => { if (last) doCopy(buildText([last], last.ts)); });
   $('shareRes').addEventListener('click', () => { if (last) doShare(buildText([last], last.ts)); });
   $('waRes').addEventListener('click', () => { if (last) doWhatsApp(buildText([last], last.ts)); });
@@ -1307,7 +1386,7 @@ function buildJpegBlob(entries, when, modo){
   $('hWa').addEventListener('click', () => { if (hist.length) doWhatsApp(buildText(histEntries())); });
   $('hMail').addEventListener('click', () => { if (hist.length) doMail(buildText(histEntries())); });
   $('hTxt').addEventListener('click', exportTxt);
-  $('clear').addEventListener('click', () => { if (confirm('Apagar todo o histórico?')) { hist = []; saveHist(); renderHist(); } });
+  $('clear').addEventListener('click', () => { if (confirm('Apagar todo o histórico?')) { cancelEdit(); hist = []; saveHist(); renderHist(); } });
 
   function syncModo(){
     document.querySelectorAll('input.modoRadio').forEach(r => { r.checked = (r.value === modoTexto); });

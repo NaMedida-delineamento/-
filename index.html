@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>NaMedida</title>
-<meta name="theme-color" content="#0b6e8a">
+<meta name="theme-color" content="#0d0e10">
 <meta name="description" content="Cálculo de área de superfície a pintar por elemento.">
 <link rel="manifest" href="manifest.json">
 <link rel="icon" type="image/png" href="icons/icon-192.png">
@@ -12,90 +12,239 @@
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="NaMedida">
-<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-status-bar-style" content="black">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Semi+Condensed:wght@500;600;700&family=Inter:wght@400;500;600&display=swap">
 <style>
-  :root{
+/* Layout: cabeçalho + painel "Parâmetros de Engenharia" (visualização 3D com seleção de elementos, geometria, identificação, tinta)
+   + coluna "Análise & Exportação" (resultado e histórico). Celular: uma coluna com botão Calcular fixo no rodapé. */
+:root{
   color-scheme: dark;
-  --bg:#0a0a0a;          /* fundo da página */
-  --card:#171717;        /* cards, cinza bem escuro */
-  --ink:#f2f2f2;         /* texto principal */
-  --muted:#a3a3a3;       /* texto secundário */
-  --line:#3a3a3a;        /* bordas em cinza escuro */
-  --accent:#dc8f43;      /* laranja principal */
-  --accent-ink:#141414;  /* texto sobre o laranja */
-  --accent-soft:#242424; /* fundo do resultado e do aviso de instalação */
-  --warn:#ff8a80;
-  --ok:#6fd49a;
+  --bg:#0d0e10;
+  --panel-a:#1c1d21;
+  --panel-b:#141518;
+  --inset:#101114;
+  --edge:rgba(255,255,255,.07);
+  --edge-2:rgba(255,255,255,.14);
+  --field-edge:#2d2f35;
+  --ink:#eceef1;
+  --muted:#8d919a;
+  --dim:#5e626a;
+  --accent:#f07a12;
+  --accent-2:#ff9b3e;
+  --accent-deep:#b65100;
+  --accent-soft:rgba(240,122,18,.14);
+  --glow:rgba(240,122,18,.45);
+  --warn:#ff6b5b;
+  --ok:#7fd6a0;
+  --metal-hi:#f07a12;
+  --metal-lo:#f07a12;
+  --on-metal:#16171a;
+  --radius:14px;
+  --f-display:"Barlow Semi Condensed","Arial Narrow",system-ui,sans-serif;
+  --f-body:"Inter",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  --f-mono:ui-monospace,Menlo,Consolas,monospace;
 }
-  *{box-sizing:border-box}
-  body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
-  main{max-width:760px;margin:0 auto;padding:20px 16px 60px}
-  h1{font-size:1.4rem;margin:0 0 2px}
-  .sub{color:var(--muted);margin:0 0 18px;font-size:.95rem}
-  .card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:16px;margin-bottom:16px}
-  .lbl{display:block;font-size:.85rem;font-weight:600;color:var(--muted);margin:14px 0 6px}
-  .lbl:first-child{margin-top:0}
-  .chips{display:flex;flex-wrap:wrap;gap:8px}
-  .chips input{position:absolute;opacity:0;pointer-events:none}
-  .chips label{border:1px solid var(--line);border-radius:999px;padding:7px 14px;cursor:pointer;font-size:.92rem;user-select:none;background:var(--card)}
-  .chips input:checked + label{background:var(--accent);color:var(--accent-ink);border-color:var(--accent);font-weight:600}
-  .chips input:focus-visible + label{outline:2px solid var(--accent);outline-offset:2px}
-  input[type=text],select{width:100%;padding:12px 14px;border:1px solid var(--line);border-radius:10px;background:var(--bg);color:var(--ink);font:inherit}
-  input[type=text]:focus,select:focus{outline:2px solid var(--accent);border-color:transparent}
-  .grid{display:grid;grid-template-columns:1fr 1fr;gap:0 14px}
-  @media (max-width:560px){.grid{grid-template-columns:1fr}}
-  .check{display:flex;gap:10px;align-items:center;margin-top:16px;font-size:.95rem}
-  .check input{width:20px;height:20px;accent-color:var(--accent)}
-  details{margin-top:16px;border-top:1px solid var(--line);padding-top:12px}
-  summary{cursor:pointer;font-weight:600;color:var(--accent)}
-  button{font:inherit;cursor:pointer;border-radius:10px;border:1px solid var(--line);background:var(--card);color:var(--ink);padding:10px 14px}
-  button.primary{width:100%;background:var(--accent);color:var(--accent-ink);border-color:var(--accent);font-weight:700;padding:14px;margin-top:18px;font-size:1.05rem}
-  button.small{padding:6px 10px;font-size:.85rem}
-  .err{color:var(--warn);margin-top:12px;font-weight:600}
-  .result{border-color:var(--accent);background:var(--accent-soft)}
-  .big{font-size:2.2rem;font-weight:800;line-height:1.1}
-  .big small{font-size:1rem;font-weight:600;color:var(--muted)}
-  .formula{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:.85rem;color:var(--muted);margin:10px 0 0;word-break:break-word}
-  .kv{display:flex;justify-content:space-between;gap:12px;padding:6px 0;border-bottom:1px dashed var(--line)}
-  .kv:last-child{border-bottom:0}
-  .row-actions{display:flex;flex-wrap:wrap;gap:8px;margin-top:14px}
-  .modo{border:1px solid var(--line);border-radius:10px;padding:8px 12px 10px;margin:14px 0 0;background:var(--card)}
-  .modo legend{font-size:.85rem;font-weight:600;color:var(--muted);padding:0 6px}
-  .modo label{display:inline-flex;align-items:center;gap:8px;margin:2px 16px 2px 0;cursor:pointer}
-  .modo input{width:20px;height:20px;accent-color:var(--accent)}
-  .hist-item{border:1px solid var(--line);border-radius:10px;padding:10px 12px;margin-top:10px;display:flex;justify-content:space-between;gap:10px;align-items:flex-start}
-  .hist-item b{display:block}
-  .hist-item span{color:var(--muted);font-size:.85rem}
-  .total{display:flex;justify-content:space-between;font-weight:700;margin-top:14px;padding-top:12px;border-top:2px solid var(--line)}
-  #installBox{display:flex;flex-wrap:wrap;align-items:center;gap:10px;margin:0 0 16px;padding:12px 14px;border:1px dashed var(--accent);border-radius:12px;background:var(--accent-soft);font-size:.92rem}
-  #installBox button{background:var(--accent);color:var(--accent-ink);border-color:var(--accent);font-weight:700}
-  #installBox .x{background:transparent;color:var(--muted);border-color:transparent;margin-left:auto}
-  #toast{position:fixed;left:50%;bottom:24px;transform:translate(-50%,20px);background:var(--ink);color:var(--bg);padding:10px 16px;border-radius:10px;font-size:.9rem;opacity:0;pointer-events:none;transition:opacity .2s,transform .2s;max-width:90vw;z-index:10;text-align:center}
-  #toast.show{opacity:1;transform:translate(-50%,0)}
-    #installFab{position:fixed;right:16px;bottom:calc(16px + env(safe-area-inset-bottom,0px));width:46px;height:46px;padding:0;border-radius:50%;display:flex;align-items:center;justify-content:center;background:var(--accent);color:var(--accent-ink);border:0;box-shadow:0 2px 10px rgba(0,0,0,.3);z-index:9}
-    .hidden{display:none !important}
+*,*::before,*::after{box-sizing:border-box}
+html,body{height:100%}
+body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.45 var(--f-body);-webkit-font-smoothing:antialiased;
+  background-image:radial-gradient(1100px 480px at 10% -10%,rgba(240,122,18,.07),transparent 60%)}
+.hidden{display:none !important}
+:focus-visible{outline:2px solid var(--accent-2);outline-offset:2px}
+
+/* ---------- casca ---------- */
+.app{display:flex;flex-direction:column;min-height:100%;
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+.topbar{display:flex;align-items:center;justify-content:space-between;gap:12px;padding-block:14px;border-bottom:1px solid var(--edge)}
+.brand{display:flex;align-items:center;gap:11px;min-width:0}
+.brand svg{flex:none}
+h1{margin:0;font:700 1.3rem/1.1 var(--f-display);color:var(--accent);letter-spacing:.01em}
+.sub{color:var(--dim);margin:2px 0 0;font-size:.75rem}
+.pill{display:inline-flex;align-items:center;gap:7px;font-size:.75rem;color:var(--muted);border:1px solid var(--edge-2);border-radius:999px;padding:5px 11px;white-space:nowrap}
+.pill i{width:7px;height:7px;border-radius:50%;background:var(--ok);box-shadow:0 0 8px var(--ok)}
+@media (max-width:620px){.pill{display:none}}
+
+main.dashboard-layout{display:flex;flex-direction:column;gap:16px;padding-block:16px 120px}
+.card{background:linear-gradient(180deg,var(--panel-a),var(--panel-b));border:1px solid var(--edge);border-radius:var(--radius);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.04),0 12px 32px rgba(0,0,0,.45);padding:18px;min-width:0}
+.panel-head{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:baseline;gap:4px 12px;margin-bottom:14px}
+.panel-head h2{margin:0;font:600 1.25rem/1.2 var(--f-display);letter-spacing:.01em;display:flex;align-items:center;gap:9px}
+.panel-head h2::before{content:"";width:8px;height:8px;border-radius:50%;background:var(--accent);box-shadow:0 0 6px var(--accent),0 0 14px var(--glow)}
+.panel-meta{font:500 .75rem var(--f-display);letter-spacing:.08em;text-transform:uppercase;color:var(--dim)}
+
+/* etapas do painel de engenharia */
+.step{display:flex;align-items:center;gap:10px;margin:24px 0 2px;font:600 .8rem var(--f-display);letter-spacing:.1em;text-transform:uppercase;color:var(--accent-2)}
+.step::after{content:"";flex:1;height:1px;background:var(--edge)}
+.step b{display:inline-grid;place-items:center;width:20px;height:20px;border-radius:5px;border:1px solid rgba(255,155,62,.45);font-size:.72rem;color:var(--accent-2)}
+
+.lbl{display:block;font:500 .8rem var(--f-display);letter-spacing:.05em;text-transform:uppercase;color:var(--muted);margin:14px 0 6px}
+
+/* ---------- visualização de engenharia + seleção de elementos ---------- */
+.viewport{position:relative;border-radius:11px;background:var(--inset);border:1px solid var(--edge);overflow:hidden;aspect-ratio:4/3;max-width:100%;
+  background-image:linear-gradient(rgba(255,255,255,.035) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.035) 1px,transparent 1px);
+  background-size:24px 24px;background-position:center;touch-action:pan-y;cursor:grab}
+.viewport:active{cursor:grabbing}
+.viewport canvas{display:block;width:100%;height:100%}
+.chips input{position:absolute;opacity:0;pointer-events:none}
+#types{position:absolute;left:0;right:0;top:0;z-index:2;display:flex;gap:6px;padding:10px;overflow-x:auto;scrollbar-width:none;
+  background:linear-gradient(to bottom,rgba(16,17,20,.96) 55%,rgba(16,17,20,0));cursor:default}
+#types::-webkit-scrollbar{display:none}
+#types label{flex:none;background:rgba(28,29,33,.92);border:1px solid var(--field-edge);color:var(--muted);border-radius:8px;padding:7px 13px;
+  font:600 .92rem var(--f-display);letter-spacing:.02em;white-space:nowrap;cursor:pointer;user-select:none;transition:color .2s,border-color .2s,box-shadow .2s}
+#types label:hover{color:var(--ink);border-color:rgba(255,255,255,.25)}
+#types input:checked + label{color:#fff;border-color:#ffb36e;background:var(--accent);}
+.chips input:focus-visible + label{outline:2px solid var(--accent-2);outline-offset:2px}
+.vp-dims{position:absolute;left:10px;bottom:10px;max-width:calc(100% - 20px);font:600 .9rem var(--f-display);letter-spacing:.03em;color:var(--ink);
+  background:rgba(16,17,20,.85);border:1px solid var(--edge-2);border-radius:7px;padding:5px 9px;pointer-events:none;font-variant-numeric:tabular-nums;white-space:pre-wrap}
+.vp-dims:empty{display:none}
+.vp-spin{position:absolute;right:10px;top:58px;z-index:2;min-height:32px;padding:5px 11px;font-size:.8rem;border-radius:7px;background:rgba(16,17,20,.85);color:var(--muted);border-color:var(--edge-2)}
+@media (max-width:559px){.vp-hint{display:none}}
+.vp-hint{position:absolute;right:10px;bottom:12px;font-size:.7rem;color:var(--dim);pointer-events:none}
+
+#units{display:flex;flex-wrap:wrap;gap:8px}
+#units label{background:var(--inset);border:1px solid var(--field-edge);color:var(--ink);border-radius:8px;padding:8px 18px;font:600 .95rem var(--f-display);cursor:pointer;user-select:none;transition:all .2s}
+#units label:hover{border-color:rgba(255,255,255,.25)}
+#units input:checked + label{border-color:var(--accent);color:var(--accent-2);background:var(--accent-soft)}
+
+/* ---------- campos ---------- */
+.grid{display:grid;grid-template-columns:1fr;gap:0 14px}
+@media (min-width:560px){.grid{grid-template-columns:1fr 1fr}.viewport{aspect-ratio:16/8}}
+input[type=text],select{width:100%;min-height:46px;padding:12px 13px;border:1px solid var(--field-edge);border-radius:9px;background:var(--inset);color:var(--ink);
+  font:500 1rem var(--f-body);font-variant-numeric:tabular-nums;outline:none;transition:border-color .2s,box-shadow .2s}
+input[type=text]::placeholder{color:var(--dim)}
+input[type=text]:focus,select:focus{border-color:var(--accent);box-shadow:0 0 0 3px rgba(240,122,18,.16),0 0 20px rgba(240,122,18,.28)}
+select{appearance:none;-webkit-appearance:none;padding-right:40px;cursor:pointer;
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1.5l5 5 5-5' fill='none' stroke='%23b8bcc4' stroke-width='1.6'/%3E%3C/svg%3E");
+  background-repeat:no-repeat;background-position:right 15px center}
+.check{display:flex;gap:10px;align-items:center;margin-top:16px;font-size:.92rem;padding:12px 14px;border:1px dashed var(--field-edge);border-radius:9px;background:var(--inset);cursor:pointer}
+.check input{width:20px;height:20px;flex:none;accent-color:var(--accent)}
+details{margin-top:24px;border-top:1px solid var(--edge);padding-top:14px}
+summary{cursor:pointer;font:600 1rem var(--f-display);color:var(--accent-2);list-style:none;display:flex;align-items:center;gap:9px}
+summary::-webkit-details-marker{display:none}
+summary::before{content:"";width:8px;height:8px;border-right:2px solid currentColor;border-bottom:2px solid currentColor;transform:rotate(-45deg);transition:transform .2s}
+details[open] summary::before{transform:rotate(45deg)}
+@media (min-width:760px){details .grid{grid-template-columns:1fr 1fr 1fr}}
+.err{color:var(--warn);margin-top:14px;font-weight:600;font-size:.92rem;border:1px solid rgba(255,107,91,.35);background:rgba(255,107,91,.08);padding:10px 12px;border-radius:8px}
+
+/* ---------- botões ---------- */
+button{font:600 .95rem var(--f-display);letter-spacing:.02em;cursor:pointer;border-radius:9px;border:1px solid var(--field-edge);background:var(--inset);color:var(--ink);
+  padding:10px 14px;min-height:42px;transition:border-color .2s,color .2s,background .2s,filter .2s,transform .1s}
+button:hover{border-color:var(--accent);color:var(--accent-2)}
+button:active{transform:scale(.98)}
+button.small{min-height:34px;padding:6px 10px;font-size:.85rem}
+button.primary{width:100%;min-height:54px;border-radius:12px;border:1px solid #f07a12;color:var(--on-metal);
+  background:#f07a12;
+  box-shadow:none;
+  font:700 1.1rem var(--f-display);letter-spacing:.12em;text-transform:uppercase}
+button.primary:hover{color:var(--on-metal);filter:brightness(1.06)}
+.dock{position:fixed;left:0;right:0;bottom:0;z-index:20;
+  padding:18px max(16px,env(safe-area-inset-right,0px)) calc(14px + env(safe-area-inset-bottom,0px)) max(16px,env(safe-area-inset-left,0px));
+  background:linear-gradient(to top,var(--bg) 62%,rgba(13,14,16,0))}
+
+/* ---------- análise ---------- */
+.result{border-color:rgba(240,122,18,.4);box-shadow:inset 0 1px 0 rgba(255,255,255,.04),0 0 0 1px rgba(240,122,18,.08),0 12px 32px rgba(0,0,0,.45)}
+.big{font:600 2.8rem/1.05 var(--f-display);font-variant-numeric:tabular-nums;margin-top:4px}
+.big small{font-size:1.1rem;font-weight:500;color:var(--muted);margin-left:2px}
+.formula{font-family:var(--f-mono);font-size:.85rem;color:var(--ink);margin:12px 0 0;word-break:break-word;background:var(--inset);
+  border:1px dashed rgba(240,122,18,.35);border-radius:8px;padding:10px 12px}
+.formula::before{content:"Fórmula";display:block;font:600 .7rem var(--f-display);letter-spacing:.1em;text-transform:uppercase;color:var(--accent-2);margin-bottom:3px}
+.kv{display:flex;justify-content:space-between;gap:12px;padding:8px 0;border-bottom:1px solid var(--edge);font-size:.92rem;font-variant-numeric:tabular-nums}
+.kv span{color:var(--muted)}
+.kv:last-child{border-bottom:0}
+.modo{border:1px solid var(--edge);border-radius:10px;padding:8px 10px 10px;margin:14px 0 0;display:flex;flex-wrap:wrap;gap:8px;min-width:0}
+.modo legend{font:500 .78rem var(--f-display);letter-spacing:.06em;text-transform:uppercase;color:var(--muted);padding:0 6px}
+.modo label{flex:1 1 140px;display:inline-flex;align-items:center;gap:8px;padding:9px 12px;border:1px solid var(--field-edge);border-radius:8px;background:var(--inset);cursor:pointer;font-size:.9rem}
+.modo label:has(input:checked){border-color:var(--accent);background:var(--accent-soft);color:var(--accent-2)}
+.modo input{width:18px;height:18px;flex:none;accent-color:var(--accent)}
+.row-actions{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:14px}
+#add{grid-column:1/-1;border-color:rgba(240,122,18,.5);background:var(--accent-soft);color:var(--accent-2)}
+.res-empty{display:none;border-style:dashed;text-align:center;color:var(--muted);font-size:.9rem;padding:26px 18px}
+.res-empty b{display:block;font:600 1.05rem var(--f-display);color:var(--ink);margin-bottom:4px}
+#res.hidden + .res-empty{display:block}
+
+/* ---------- histórico ---------- */
+#histCard > strong{display:block;font:600 1.15rem var(--f-display)}
+.hist-item{border:1px solid var(--edge);background:var(--inset);border-radius:10px;padding:10px 12px;margin-top:10px;display:flex;justify-content:space-between;gap:10px;align-items:flex-start}
+.hist-item > div{min-width:0}
+.hist-item b{display:block;font-size:.92rem;font-variant-numeric:tabular-nums;overflow-wrap:anywhere}
+.hist-item span{color:var(--muted);font-size:.8rem;overflow-wrap:anywhere}
+.hist-item button{color:var(--warn);background:transparent;border-color:transparent;flex:none}
+.hist-item button:hover{border-color:var(--warn);color:var(--warn);background:rgba(255,107,91,.1)}
+.total{display:flex;justify-content:space-between;gap:10px;font:600 1.1rem var(--f-display);margin-top:14px;padding-top:12px;border-top:2px solid var(--edge-2);font-variant-numeric:tabular-nums}
+.total span:last-child{color:var(--accent-2)}
+#histActions{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+#clear{grid-column:1/-1;color:var(--warn)}
+#clear:hover{border-color:var(--warn);background:rgba(255,107,91,.1)}
+#histEmpty{color:var(--dim);font-size:.88rem}
+
+/* ---------- instalação e avisos ---------- */
+#installBox{display:flex;flex-wrap:wrap;align-items:center;gap:10px;margin:0 0 16px;padding:12px 14px;border:1px dashed var(--accent);border-radius:12px;background:var(--accent-soft);font-size:.9rem}
+#installBox button{background:var(--accent);color:#fff;border-color:var(--accent)}
+#installBox .x{background:transparent;color:var(--muted);border-color:transparent;margin-left:auto}
+#toast{position:fixed;left:50%;bottom:calc(96px + env(safe-area-inset-bottom,0px));transform:translate(-50%,20px);background:#202126;color:var(--ink);border:1px solid var(--edge-2);
+  padding:10px 16px;border-radius:10px;font-size:.9rem;opacity:0;pointer-events:none;transition:opacity .2s,transform .2s;max-width:90vw;z-index:30;text-align:center;box-shadow:0 10px 30px rgba(0,0,0,.6)}
+#toast.show{opacity:1;transform:translate(-50%,0)}
+#installFab{position:fixed;right:max(16px,env(safe-area-inset-right,0px));bottom:calc(96px + env(safe-area-inset-bottom,0px));width:46px;height:46px;min-height:0;padding:0;border-radius:50%;
+  display:flex;align-items:center;justify-content:center;background:var(--accent);color:#fff;border:0;box-shadow:0 4px 12px rgba(0,0,0,.5);z-index:25}
+
+/* ---------- desktop ---------- */
+@media (min-width:1000px){
+  .app{height:100%}
+  main.dashboard-layout{flex:1;min-height:0;display:grid;grid-template-columns:minmax(0,1fr) 400px;gap:18px;padding-block:18px}
+  .col-inputs,.col-results{overflow-y:auto;scrollbar-width:thin;scrollbar-color:#33353a transparent}
+  .col-results{display:flex;flex-direction:column;gap:16px;padding-right:2px}
+  .col-results > .card{flex:none}
+  .viewport{aspect-ratio:16/7}
+  .dock{position:sticky;bottom:-18px;margin:20px -18px -18px;padding:16px 18px 18px;background:linear-gradient(to top,var(--panel-b) 75%,rgba(20,21,24,0))}
+  #toast{bottom:28px}
+  #installFab{bottom:24px}
+}
+@media (prefers-reduced-motion:reduce){*,*::before,*::after{transition:none !important}}
 </style>
 </head>
 <body>
-<main>
-  <h1>NaMedida - Delineamento</h1>
-  <p class="sub">Developer by Pedro Santos.</p>
-
-  <div id="installBox" class="hidden">
-    <span id="installMsg">Instale como app para abrir direto da tela inicial e usar offline.</span>
-    <button type="button" id="installBtn" class="hidden">Instalar app</button>
-    <button type="button" class="small x" id="installClose" aria-label="Fechar">Fechar</button>
+<div class="app">
+<header class="topbar">
+  <div class="brand">
+    <svg width="30" height="30" viewBox="0 0 32 32" aria-hidden="true"><path d="M5 27V5l22 22V5" fill="none" stroke="#f07a12" stroke-width="4"/></svg>
+    <div>
+      <h1>NaMedida - Delineamento</h1>
+      <p class="sub">Developer by Pedro Santos.</p>
+    </div>
   </div>
+  <span class="pill"><i></i>Área de superfície · m²</span>
+</header>
 
-  <section class="card">
-    <span class="lbl">Tipo de elemento</span>
-    <div class="chips" id="types"></div>
+<main class="dashboard-layout">
 
+  <section class="card col-inputs" aria-labelledby="t-par">
+    <div id="installBox" class="hidden">
+      <span id="installMsg">Instale como app para abrir direto da tela inicial e usar offline.</span>
+      <button type="button" id="installBtn" class="hidden">Instalar app</button>
+      <button type="button" class="small x" id="installClose" aria-label="Fechar">Fechar</button>
+    </div>
+
+    <div class="panel-head">
+      <h2 id="t-par">Parâmetros de Engenharia</h2>
+      <span class="panel-meta">Delineamento de superfície</span>
+    </div>
+
+    <div class="viewport" id="vp">
+      <div class="chips" id="types" role="radiogroup" aria-label="Tipo de elemento"></div>
+      <canvas id="wire" aria-hidden="true"></canvas>
+      <button type="button" class="vp-spin" id="vpSpin" aria-pressed="true">Pausar giro</button>
+      <span class="vp-hint">arraste para girar</span>
+      <span class="vp-dims" id="vpDims"></span>
+    </div>
+
+    <div class="step"><b>1</b>Geometria</div>
     <span class="lbl">Unidade das medidas lineares</span>
     <div class="chips" id="units"></div>
 
     <div class="grid" id="fields"></div>
 
+    <div class="step"><b>2</b>Quantidade e identificação</div>
     <div class="grid">
       <div>
         <label class="lbl" for="qtd">Quantidade de peças</label>
@@ -128,52 +277,65 @@
       </div>
     </details>
 
-    <button class="primary" id="go" type="button">Calcular</button>
     <div class="err hidden" id="err" role="alert"></div>
-  </section>
-
-  <section class="card result hidden" id="res" aria-live="polite">
-    <div class="big" id="resArea"></div>
-    <p class="formula" id="resFormula"></p>
-    <div id="resExtra" style="margin-top:12px"></div>
-    <fieldset class="modo">
-      <legend>Texto a enviar</legend>
-      <label><input class="modoRadio" type="radio" name="modoTextoRes" value="jateada"> Superfície Jateada</label>
-      <label><input class="modoRadio" type="radio" name="modoTextoRes" value="pintada"> Estrutura Pintada</label>
-    </fieldset>
-    <div class="row-actions">
-      <button type="button" id="add">Adicionar ao histórico</button>
-      <button type="button" id="copy">Copiar texto</button>
-      <button type="button" id="pdfRes">Exportar PDF</button>
-      <button type="button" id="shareRes">Compartilhar</button>
-      <button type="button" id="waRes">WhatsApp</button>
+    <div class="dock">
+      <button class="primary" id="go" type="button">Calcular</button>
     </div>
   </section>
 
-  <section class="card" id="histCard">
-    <strong>Histórico</strong>
-    <div id="hist"></div>
-    <div class="total hidden" id="total"><span>Área total</span><span id="totalVal"></span></div>
-    <div class="hidden" id="histModo">
-    <fieldset class="modo">
-      <legend>Texto a enviar</legend>
-      <label><input class="modoRadio" type="radio" name="modoTextoHist" value="jateada"> Superfície Jateada</label>
-      <label><input class="modoRadio" type="radio" name="modoTextoHist" value="pintada"> Estrutura Pintada</label>
-    </fieldset>
+  <div class="col-results">
+    <section class="card result hidden" id="res" aria-live="polite">
+      <div class="panel-head">
+        <h2>Análise &amp; Exportação</h2>
+        <span class="panel-meta">Área de superfície</span>
+      </div>
+      <div class="big" id="resArea"></div>
+      <p class="formula" id="resFormula"></p>
+      <div id="resExtra" style="margin-top:12px"></div>
+      <fieldset class="modo">
+        <legend>Texto a enviar</legend>
+        <label><input class="modoRadio" type="radio" name="modoTextoRes" value="jateada"> Superfície Jateada</label>
+        <label><input class="modoRadio" type="radio" name="modoTextoRes" value="pintada"> Estrutura Pintada</label>
+      </fieldset>
+      <div class="row-actions">
+        <button type="button" id="add">Adicionar ao histórico</button>
+        <button type="button" id="copy">Copiar texto</button>
+        <button type="button" id="pdfRes">Exportar PDF</button>
+        <button type="button" id="shareRes">Compartilhar</button>
+        <button type="button" id="waRes">WhatsApp</button>
+      </div>
+    </section>
+    <div class="card res-empty">
+      <b>Análise &amp; Exportação</b>
+      Preencha a geometria e toque em Calcular. A área, a fórmula usada e o consumo de tinta aparecem aqui.
     </div>
-    <div class="row-actions hidden" id="histActions">
-      <button type="button" id="xlsx">Exportar Excel (.xlsx)</button>
-      <button type="button" id="hPdf">Exportar PDF</button>
-      <button type="button" id="hCopy">Copiar texto</button>
-      <button type="button" id="hShare">Compartilhar</button>
-      <button type="button" id="hWa">WhatsApp</button>
-      <button type="button" id="hMail">E-mail</button>
-      <button type="button" id="hTxt">Baixar .txt</button>
-      <button type="button" id="clear">Limpar histórico</button>
-    </div>
-    <p class="sub" id="histEmpty" style="margin:10px 0 0">Nenhum cálculo adicionado ainda.</p>
-  </section>
+
+    <section class="card" id="histCard">
+      <strong>Histórico</strong>
+      <div id="hist"></div>
+      <div class="total hidden" id="total"><span>Área total</span><span id="totalVal"></span></div>
+      <div class="hidden" id="histModo">
+      <fieldset class="modo">
+        <legend>Texto a enviar</legend>
+        <label><input class="modoRadio" type="radio" name="modoTextoHist" value="jateada"> Superfície Jateada</label>
+        <label><input class="modoRadio" type="radio" name="modoTextoHist" value="pintada"> Estrutura Pintada</label>
+      </fieldset>
+      </div>
+      <div class="row-actions hidden" id="histActions">
+        <button type="button" id="xlsx">Exportar Excel (.xlsx)</button>
+        <button type="button" id="hPdf">Exportar PDF</button>
+        <button type="button" id="hCopy">Copiar texto</button>
+        <button type="button" id="hShare">Compartilhar</button>
+        <button type="button" id="hWa">WhatsApp</button>
+        <button type="button" id="hMail">E-mail</button>
+        <button type="button" id="hTxt">Baixar .txt</button>
+        <button type="button" id="clear">Limpar histórico</button>
+      </div>
+      <p class="sub" id="histEmpty" style="margin:10px 0 0">Nenhum cálculo adicionado ainda.</p>
+    </section>
+  </div>
 </main>
+</div>
 <div id="toast" role="status" aria-live="polite"></div>
 <button type="button" id="installFab" class="hidden" aria-label="Instalar app" title="Instalar app">
   <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
@@ -1062,6 +1224,199 @@ function buildPdfBytes(entries, when, modo){
     if (deferred || ios) fab.classList.remove('hidden');
   });
 })();
+</script>
+<script>
+/*VISUAL-START
+  Somente visual: lê o formulário (tipo, unidade e medidas) e desenha a prévia em wireframe.
+  Não altera valores, não participa do cálculo e pode ser removido sem afetar o app. */
+(function(){
+  var cv = document.getElementById('wire');
+  if (!cv || !cv.getContext) return;
+  var ctx = cv.getContext('2d'), vp = document.getElementById('vp'), dimsEl = document.getElementById('vpDims');
+  var segs = [], dim = null, yaw = -0.6, pitch = 0.42, drag = null, idle = 0, dirty = true;
+  // giro automático ligado por padrão; o botão do canto pausa e a escolha fica salva no aparelho
+  var spin = true, spinBtn = document.getElementById('vpSpin');
+  try { spin = localStorage.getItem('delineamento-giro') !== 'off'; } catch(e){}
+  function syncSpin(){ if (!spinBtn) return; spinBtn.textContent = spin ? 'Pausar giro' : 'Girar peça'; spinBtn.setAttribute('aria-pressed', spin ? 'true' : 'false'); }
+  if (spinBtn) spinBtn.addEventListener('click', function(){ spin = !spin; syncSpin(); try { localStorage.setItem('delineamento-giro', spin ? 'on' : 'off'); } catch(e){} });
+  syncSpin();
+  var SYM = {d:'D', l:'L', t:'t', h:'h', b:'b', tf:'tf', tw:'tw', c:'C', w:'W', e:'e', a:'A', dev:'Dev'};
+  function clamp(x, a, b){ return Math.max(a, Math.min(b, x)); }
+
+  function num(id){
+    var el = document.getElementById('f-' + id);
+    if (!el) return null;
+    var s = String(el.value).trim().replace(',', '.'), n = Number(s);
+    if (s !== '' && n > 0) return n;
+    var m = String(el.placeholder || '').match(/[\d.]+/);
+    return m ? Number(m[0]) : null;
+  }
+  function sel(id, def){ var el = document.getElementById('f-' + id); return el ? el.value : def; }
+  function current(){ var r = document.querySelector('#types input:checked'); return r ? r.value : 'tubo'; }
+  function unitLabel(){ var r = document.querySelector('#units input:checked + label'); return r ? r.textContent : ''; }
+
+  function circle(r, n){ n = n || 32; var p = []; for (var i = 0; i < n; i++){ var a = i / n * 2 * Math.PI; p.push([r * Math.cos(a), r * Math.sin(a)]); } return p; }
+  function ring(s, pts, hi){ for (var j = 0; j < pts.length; j++) s.push([pts[j], pts[(j + 1) % pts.length], hi]); }
+  // extrusão ao longo de x; poly em (y, z)
+  function extrude(poly, L, slices, step, inner){
+    var s = [];
+    for (var i = 0; i <= slices; i++){
+      var x = -L / 2 + L * i / slices, hi = i === slices;
+      ring(s, poly.map(function(p){ return [x, p[0], p[1]]; }), hi);
+      if (inner && (i === 0 || hi)) ring(s, inner.map(function(p){ return [x, p[0], p[1]]; }), hi);
+    }
+    poly.forEach(function(p, j){ if (j % (step || 1) === 0) s.push([[-L / 2, p[0], p[1]], [L / 2, p[0], p[1]], false]); });
+    return s;
+  }
+  function vertical(s){ return s.map(function(g){ return [[g[0][1], g[0][0], g[0][2]], [g[1][1], g[1][0], g[1][2]], g[2]]; }); }
+  function ext(poly){ var m = 0; poly.forEach(function(p){ m = Math.max(m, Math.abs(p[0])); }); return m; }
+
+  function lenDim(L, poly, label){ var y = -ext(poly) * 1.6 - L * 0.04; return {a:[-L / 2, y, 0], b:[L / 2, y, 0], label:label}; }
+
+  function build(){
+    var t = current(), s = [], d = null, u = unitLabel();
+    var lab = function(id){ var el = document.getElementById('f-' + id); var v = el && String(el.value).trim(); return SYM[id] + ' = ' + (v ? v.replace('.', ',') + ' ' + u : '?'); };
+    if (t === 'tubo'){
+      var D = num('d') || 1, r = D / 2, L = clamp(num('l') || 3 * D, 2.2 * D, 3.4 * D), tt = num('t'), sh = circle(r);
+      s = extrude(sh, L, 5, 2, circle(Math.max(r - (tt && tt < r ? tt : r * 0.08), r * 0.25)));
+      d = lenDim(L, sh, lab('l'));
+    } else if (t === 'perfil' || t === 'viga'){
+      var h = num('h') || 1, b = num('b') || h / 2, H = h / 2, B = b / 2;
+      var shape = t === 'viga' ? 'I' : sel('shape', 'I');
+      var tw = num('tw') || b * 0.08, tf = num('tf') || Math.max(tw * 1.4, h * 0.05);
+      tf = Math.min(tf, H * 0.45); tw = Math.min(tw, B * 0.6);
+      var P, inner = null;
+      if (shape === 'U') P = [[H,-B],[H,B],[H-tf,B],[H-tf,-B+tw],[-H+tf,-B+tw],[-H+tf,B],[-H,B],[-H,-B]];
+      else if (shape === 'T') P = [[H,-B],[H,B],[H-tf,B],[H-tf,tw/2],[-H,tw/2],[-H,-tw/2],[H-tf,-tw/2],[H-tf,-B]];
+      else if (shape === 'BOX'){ var w = Math.min(h, b) * 0.08; P = [[H,-B],[H,B],[-H,B],[-H,-B]]; inner = [[H-w,-B+w],[H-w,B-w],[-H+w,B-w],[-H+w,-B+w]]; }
+      else P = [[H,-B],[H,B],[H-tf,B],[H-tf,tw/2],[-H+tf,tw/2],[-H+tf,B],[-H,B],[-H,-B],[-H+tf,-B],[-H+tf,-tw/2],[H-tf,-tw/2],[H-tf,-B]];
+      var LL = clamp(num('l') || 3 * h, 2.2 * Math.max(h, b), 4 * Math.max(h, b));
+      s = extrude(P, LL, 4, 1, inner);
+      d = lenDim(LL, P, lab('l'));
+    } else if (t === 'chapa'){
+      var C = num('c') || 2, W = num('w') || 1, Lc = clamp(C, 0.6 * W, 2.5 * W), e = Math.max(num('e') || 0, 0.025 * Math.max(Lc, W));
+      var R = [[e/2,-W/2],[e/2,W/2],[-e/2,W/2],[-e/2,-W/2]];
+      s = extrude(R, Lc, 3, 1);
+      d = {a:[-Lc/2, -e/2, W/2 + W*0.18], b:[Lc/2, -e/2, W/2 + W*0.18], label:lab('c')};
+    } else if (t === 'cantoneira'){
+      var A = num('a') || 1, Bb = num('b') || A, ee = Math.min(A, Bb) * 0.1, M = Math.max(A, Bb);
+      var Lp = [[A,0],[A,ee],[ee,ee],[ee,Bb],[0,Bb],[0,0]].map(function(p){ return [p[0] - A/2, p[1] - Bb/2]; });
+      var La = clamp(num('l') || 3 * M, 2.4 * M, 4.2 * M);
+      s = extrude(Lp, La, 4, 1);
+      d = lenDim(La, Lp, lab('l'));
+    } else if (t === 'tanque'){
+      var kind = sel('kind', 'esfera'), Dt = num('d') || 1, rt = Dt / 2, i, k;
+      if (kind === 'esfera'){
+        for (i = 1; i < 8; i++){ var ph = -Math.PI/2 + Math.PI * i / 8, rr = rt * Math.cos(ph), yy = rt * Math.sin(ph);
+          ring(s, circle(rr, 36).map(function(p){ return [p[0], yy, p[1]]; }), i === 4); }
+        for (k = 0; k < 8; k++){ var th = k / 8 * Math.PI, prev = null;
+          for (i = 0; i <= 24; i++){ var a = -Math.PI/2 + Math.PI * i / 24, pt = [rt * Math.cos(a) * Math.cos(th), rt * Math.sin(a), rt * Math.cos(a) * Math.sin(th)];
+            if (prev) s.push([prev, pt, false]); prev = pt; }
+          prev = null;
+          for (i = 0; i <= 24; i++){ var a2 = Math.PI/2 + Math.PI * i / 24, pt2 = [rt * Math.cos(a2) * Math.cos(th), rt * Math.sin(a2), rt * Math.cos(a2) * Math.sin(th)];
+            if (prev) s.push([prev, pt2, false]); prev = pt2; } }
+        d = {a:[-rt, -rt * 1.25, 0], b:[rt, -rt * 1.25, 0], label:lab('d')};
+      } else {
+        var Hc = clamp(num('h') || 2 * Dt, 0.6 * Dt, 2 * Dt);
+        s = vertical(extrude(circle(rt, 40), Hc, 5, 4));
+        if (kind === 'elip'){
+          var c = Dt / 4;
+          [1, -1].forEach(function(sg){
+            for (i = 1; i <= 3; i++){ var al = Math.PI / 2 * i / 4, yh = sg * (Hc / 2 + c * Math.sin(al)), rh = rt * Math.cos(al);
+              ring(s, circle(rh, 40).map(function(p){ return [p[0], yh, p[1]]; }), sg > 0 && i === 3); }
+            for (k = 0; k < 8; k++){ var tk = k / 8 * 2 * Math.PI, pv = null;
+              for (i = 0; i <= 8; i++){ var al2 = Math.PI / 2 * i / 8, q = [rt * Math.cos(al2) * Math.cos(tk), sg * (Hc / 2 + c * Math.sin(al2)), rt * Math.cos(al2) * Math.sin(tk)];
+                if (pv) s.push([pv, q, false]); pv = q; } }
+          });
+        } else {
+          s.push([[-rt, Hc/2, 0], [rt, Hc/2, 0], true], [[0, Hc/2, -rt], [0, Hc/2, rt], true]);
+        }
+        var yb = -Hc / 2 - (kind === 'elip' ? Dt / 4 : 0) - Dt * 0.2;
+        d = {a:[-rt, yb, 0], b:[rt, yb, 0], label:lab('d')};
+      }
+    } else { // desenvolvimento linear
+      var dev = num('dev') || 0.5, sq = dev / 4, Ll = clamp(num('l') || 8 * sq, 4 * sq, 8 * sq);
+      var Q = [[sq/2,-sq/2],[sq/2,sq/2],[-sq/2,sq/2],[-sq/2,-sq/2]];
+      s = extrude(Q, Ll, 6, 1);
+      d = lenDim(Ll, Q, lab('l'));
+    }
+    var m = 0;
+    s.forEach(function(g){ g[0].concat(g[1]).forEach(function(v){ m = Math.max(m, Math.abs(v)); }); });
+    if (d) [d.a, d.b].forEach(function(p){ p.forEach(function(v){ m = Math.max(m, Math.abs(v) * 0.9); }); });
+    m = m || 1;
+    var nz = function(p){ return p.map(function(v){ return v / m; }); };
+    segs = s.map(function(g){ return [nz(g[0]), nz(g[1]), g[2]]; });
+    dim = d ? {a:nz(d.a), b:nz(d.b), label:d.label} : null;
+
+    // leitura dos parâmetros digitados (— quando vazio)
+    var parts = [];
+    document.querySelectorAll('#fields input[type=text]').forEach(function(el){
+      var id = el.id.replace('f-', ''), v = String(el.value).trim();
+      parts.push((SYM[id] || id) + ' = ' + (v ? v.replace('.', ',') + ' ' + u : '?'));
+    });
+    dimsEl.textContent = parts.join('   ·   ');
+    dirty = false;
+  }
+
+  function fit(){ var r = cv.getBoundingClientRect(), dp = window.devicePixelRatio || 1; cv.width = Math.max(1, Math.round(r.width * dp)); cv.height = Math.max(1, Math.round(r.height * dp)); }
+  function draw(){
+    var W = cv.width, H = cv.height, dp = window.devicePixelRatio || 1;
+    ctx.clearRect(0, 0, W, H);
+    var sc = Math.min(W, H) * 0.33, cx = W / 2, cy = H / 2 + H * 0.05;
+    var cyw = Math.cos(yaw), syw = Math.sin(yaw), cp = Math.cos(pitch), sp = Math.sin(pitch);
+    function proj(p){ var x1 = p[0] * cyw + p[2] * syw, z1 = -p[0] * syw + p[2] * cyw, y1 = p[1] * cp - z1 * sp, z2 = p[1] * sp + z1 * cp, f = 3.2 / (3.2 + z2);
+      return [cx + x1 * sc * f, cy - y1 * sc * f, z2]; }
+    ctx.lineWidth = Math.max(1, dp * 0.9); ctx.lineCap = 'round';
+    segs.forEach(function(g){
+      var a = proj(g[0]), b = proj(g[1]), dep = clamp(0.62 - (a[2] + b[2]) * 0.28, 0.14, 0.9);
+      ctx.strokeStyle = g[2] ? 'rgba(255,155,62,' + clamp(dep + 0.15, 0.3, 1) + ')' : 'rgba(226,229,235,' + dep + ')';
+      ctx.beginPath(); ctx.moveTo(a[0], a[1]); ctx.lineTo(b[0], b[1]); ctx.stroke();
+    });
+    if (dim){ // cota
+      var A = proj(dim.a), B = proj(dim.b), dx = B[0] - A[0], dy = B[1] - A[1], len = Math.hypot(dx, dy) || 1, nx = -dy / len * 6 * dp, ny = dx / len * 6 * dp;
+      ctx.strokeStyle = 'rgba(255,155,62,.85)'; ctx.lineWidth = Math.max(1, dp);
+      ctx.setLineDash([5 * dp, 4 * dp]); ctx.beginPath(); ctx.moveTo(A[0], A[1]); ctx.lineTo(B[0], B[1]); ctx.stroke(); ctx.setLineDash([]);
+      [A, B].forEach(function(P){ ctx.beginPath(); ctx.moveTo(P[0] - nx, P[1] - ny); ctx.lineTo(P[0] + nx, P[1] + ny); ctx.stroke(); });
+      ctx.font = '600 ' + Math.round(13 * dp) + 'px "Barlow Semi Condensed","Arial Narrow",sans-serif';
+      ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      var mx = (A[0] + B[0]) / 2, my = (A[1] + B[1]) / 2 + 14 * dp, tw = ctx.measureText(dim.label).width + 12 * dp;
+      ctx.fillStyle = 'rgba(16,17,20,.9)'; ctx.fillRect(mx - tw / 2, my - 10 * dp, tw, 20 * dp);
+      ctx.fillStyle = '#ff9b3e'; ctx.fillText(dim.label, mx, my);
+    }
+  }
+  function loop(ts){
+    if (dirty) build();
+    if (!drag && spin && ts - idle > 1200) yaw += 0.0045;
+    draw();
+    requestAnimationFrame(loop);
+  }
+
+  function mark(){ dirty = true; }
+  document.addEventListener('input', mark, true);
+  document.addEventListener('change', mark, true);
+  if (window.MutationObserver){
+    var mo = new MutationObserver(mark);
+    mo.observe(document.getElementById('fields'), {childList:true, subtree:true});
+    mo.observe(document.getElementById('units'), {childList:true, subtree:true});
+  }
+  vp.addEventListener('pointerdown', function(e){
+    if (e.target.closest('#types') || e.target.closest('#vpSpin')) return;
+    drag = {x:e.clientX, y:e.clientY, yaw:yaw, pitch:pitch};
+    try { vp.setPointerCapture(e.pointerId); } catch(err){}
+  });
+  vp.addEventListener('pointermove', function(e){
+    if (!drag) return;
+    yaw = drag.yaw + (e.clientX - drag.x) * 0.01;
+    pitch = clamp(drag.pitch + (e.clientY - drag.y) * 0.008, -1.2, 1.2);
+  });
+  function end(){ drag = null; idle = performance.now(); }
+  vp.addEventListener('pointerup', end); vp.addEventListener('pointercancel', end);
+  if (window.ResizeObserver) new ResizeObserver(function(){ fit(); }).observe(cv);
+  window.addEventListener('resize', fit);
+  fit();
+  requestAnimationFrame(loop);
+})();
+/*VISUAL-END*/
 </script>
 </body>
 </html>

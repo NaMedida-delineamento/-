@@ -1,6 +1,6 @@
 // Service worker: guarda o app no aparelho para funcionar offline.
 // Ao alterar qualquer arquivo do app, aumente o número em CACHE para forçar a atualização.
-const CACHE = 'delineamento-v9';
+const CACHE = 'delineamento-v12';
 const ASSETS = [
   './',
   './index.html',

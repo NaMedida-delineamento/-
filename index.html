@@ -301,6 +301,7 @@ button.primary:hover{color:var(--on-metal);filter:brightness(1.06)}
         <button type="button" id="add">Adicionar ao histórico</button>
         <button type="button" id="copy">Copiar texto</button>
         <button type="button" id="pdfRes">Exportar PDF</button>
+        <button type="button" id="jpgRes">Exportar JPEG</button>
         <button type="button" id="shareRes">Compartilhar</button>
         <button type="button" id="waRes">WhatsApp</button>
       </div>
@@ -324,6 +325,7 @@ button.primary:hover{color:var(--on-metal);filter:brightness(1.06)}
       <div class="row-actions hidden" id="histActions">
         <button type="button" id="xlsx">Exportar Excel (.xlsx)</button>
         <button type="button" id="hPdf">Exportar PDF</button>
+        <button type="button" id="hJpg">Exportar JPEG</button>
         <button type="button" id="hCopy">Copiar texto</button>
         <button type="button" id="hShare">Compartilhar</button>
         <button type="button" id="hWa">WhatsApp</button>
@@ -517,7 +519,7 @@ function entryBlock(e, idx){
   const title = [e.ref, e.desc].filter(Boolean).join(' — ') || 'Sem referência';
   const pad = idx ? '   ' : '';
   const lines = [(idx ? idx + ') ' : '') + title];
-  lines.push(pad + 'Elemento: ' + e.type + (e.qtd > 1 ? ' × ' + e.qtd + ' peças' : ''));
+  lines.push(pad + 'Elemento: ' + (e.qtd > 1 ? e.qtd + 'x ' : '') + e.type);
   if (e.dims) lines.push(pad + 'Medidas: ' + e.dims);
   lines.push(pad + 'Área: ' + fmtN(e.area) + ' m²' + (e.qtd > 1 ? ' (' + fmtN(e.unitArea) + ' m² por peça)' : ''));
   if (e.litros != null) lines.push(pad + 'Tinta (com perdas): ' + fmtN(e.litros) + ' L');
@@ -733,7 +735,7 @@ function pdfHex(s){
 
 function buildPdfBytes(entries, when, modo){
   const W = 595.28, H = 841.89, M = 40, CW = W - 2 * M;
-  const ACC = [0.20,0.20,0.20], SOFT = [0.92,0.92,0.92], ZEBRA = [0.97,0.97,0.97];
+  const OR = [0.941,0.478,0.071], ACC = [0.20,0.20,0.20], SOFT = [0.92,0.92,0.92], ZEBRA = [0.97,0.97,0.97];
   const INK = [0,0,0], MUT = [0.40,0.40,0.40], LINE = [0.80,0.80,0.80], WHITE = [1,1,1];
   const modoTxt = modo === 'jateada' ? 'Jateada' : 'Pintada';
   const d = when ? new Date(when) : new Date();
@@ -771,6 +773,7 @@ function buildPdfBytes(entries, when, modo){
     ops = []; pages.push(ops);
     if (first){
       rect(0, 0, W, 84, ACC);
+      rect(0, 80, W, 4, OR);
       text('DELINEAMENTO', M, 40, 22, true, WHITE);
       text('Área de superfície ' + modoTxt, M, 60, 12, false, WHITE);
       text(stamp, W - M, 40, 10, true, WHITE, 'r');
@@ -778,6 +781,7 @@ function buildPdfBytes(entries, when, modo){
       y = 106;
     } else {
       rect(0, 0, W, 28, ACC);
+      rect(0, 25, W, 3, OR);
       text('DELINEAMENTO — Área de superfície ' + modoTxt, M, 18, 9, true, WHITE);
       text(stamp, W - M, 18, 9, false, WHITE, 'r');
       y = 48;
@@ -804,7 +808,7 @@ function buildPdfBytes(entries, when, modo){
   ].forEach((b, i) => {
     const x = M + i * (bw + 10);
     rect(x, y, bw, bh, SOFT);
-    rect(x, y, 3, bh, ACC);
+    rect(x, y, 4, bh, OR);
     text(b[0], x + 14, y + 19, 7.5, true, MUT);
     text(b[1], x + 14, y + 41, 16, true, INK);
   });
@@ -817,7 +821,7 @@ function buildPdfBytes(entries, when, modo){
     const cell = {
       n: [String(i + 1)],
       item: pdfWrap(title, cols[1].w - 2 * PADX, true, FS),
-      elem: pdfWrap(e.type + (e.qtd > 1 ? '\n× ' + e.qtd + ' peças (' + fmtN(e.unitArea) + ' m² por peça)' : ''), cols[2].w - 2 * PADX, false, FS),
+      elem: pdfWrap((e.qtd > 1 ? e.qtd + 'x ' : '') + e.type + (e.qtd > 1 ? '\n(' + fmtN(e.unitArea) + ' m² por peça)' : ''), cols[2].w - 2 * PADX, false, FS),
       dims: pdfWrap(e.dims || '—', cols[3].w - 2 * PADX, false, FS),
       area: [fmtN(e.area)],
       tint: [e.litros != null ? fmtN(e.litros) : '—']
@@ -828,7 +832,14 @@ function buildPdfBytes(entries, when, modo){
     if (i % 2) rect(M, y, CW, rh, ZEBRA);
     cols.forEach(c => {
       const bold = c.key === 'item' || c.key === 'area';
-      cell[c.key].forEach((ln, k) => text(ln, c.align === 'r' ? c.x + c.w - PADX : c.x + PADX, y + 5 + FS + k * LH - 1, FS, bold, c.key === 'n' ? MUT : INK, c.align));
+      cell[c.key].forEach((ln, k) => {
+        const px = c.align === 'r' ? c.x + c.w - PADX : c.x + PADX, py = y + 5 + FS + k * LH - 1;
+        const pre = e.qtd + 'x ';
+        if (c.key === 'elem' && k === 0 && e.qtd > 1 && ln.indexOf(pre) === 0){ // quantidade em laranja: 8x
+          text(pre, px, py, FS + 1, true, OR);
+          text(ln.slice(pre.length), px + pdfTextW(pre, true, FS + 1), py, FS, bold, INK);
+        } else text(ln, px, py, FS, bold, c.key === 'n' ? MUT : INK, c.align);
+      });
     });
     hline(M, M + CW, y + rh, LINE, 0.5);
     y += rh;
@@ -838,9 +849,10 @@ function buildPdfBytes(entries, when, modo){
   if (y + 30 > H - 60){ newPage(false); tableHeader(); }
   rect(M, y, CW, 28, SOFT);
   hline(M, M + CW, y, ACC, 1.5);
+  rect(M, y + 26, CW, 2, OR);
   text('TOTAL', cols[1].x + PADX, y + 18, 10, true, INK);
-  text(fmtN(total), cols[4].x + cols[4].w - PADX, y + 18, 10, true, ACC, 'r');
-  text(comTinta.length ? fmtN(totalL) : '—', cols[5].x + cols[5].w - PADX, y + 18, 10, true, ACC, 'r');
+  text(fmtN(total), cols[4].x + cols[4].w - PADX, y + 18, 10, true, OR, 'r');
+  text(comTinta.length ? fmtN(totalL) : '—', cols[5].x + cols[5].w - PADX, y + 18, 10, true, OR, 'r');
   y += 28 + 14;
 
   const nota = comTinta.length === 0 ? '' :
@@ -881,6 +893,138 @@ function buildPdfBytes(entries, when, modo){
   const bytes = new Uint8Array(out.length);
   for (let i = 0; i < out.length; i++) bytes[i] = out.charCodeAt(i) & 255;
   return bytes;
+}
+
+/* Reconstrói os dados da peça a partir do texto das medidas (itens antigos do histórico não guardavam os valores) */
+function restoreEntry(e){
+  if (e && e.vals && e.typeKey) return e;
+  if (!e) return e;
+  const LEG = {'Perfil estrutural': 'perfil'};
+  let key = LEG[e.type];
+  if (!key) key = Object.keys(TYPES).find(k => TYPES[k].label === e.type);
+  if (!key) return e;
+  const parts = (e.dims || '').split('; '), vals = {}, ULAB = ['pol', 'mm', 'm']; let ul = '';
+  TYPES[key].fields.forEach(f => {
+    if (f.kind === 'check'){ vals[f.id] = parts.indexOf(f.label) >= 0; return; }
+    const pre = f.label + ': ', part = parts.find(x => x.indexOf(pre) === 0);
+    if (!part) return;
+    let v = part.slice(pre.length);
+    if (f.kind === 'select'){ const o = f.options.find(o => o[1] === v); if (o) vals[f.id] = o[0]; return; }
+    const u = ULAB.find(u => v.slice(-(u.length + 1)) === ' ' + u);
+    if (u){ v = v.slice(0, -(u.length + 1)); if (!ul) ul = u; }
+    vals[f.id] = v;
+  });
+  return Object.assign({}, e, {typeKey: key, vals: vals, unitLabel: e.unitLabel || ul || 'm'});
+}
+const wireFor = e => (typeof window !== 'undefined' && window.NM_wire2d) ? window.NM_wire2d(restoreEntry(e)) : null;
+
+/* ----- Desenho da peça (canvas) ----- */
+function drawWire(ctx, w2, x, y, bw, bh){
+  const pad = 10, labH = w2.dim ? 34 : 0;
+  const dx = (w2.maxx - w2.minx) || 1, dy = (w2.maxy - w2.miny) || 1;
+  const aw = bw - 2 * pad, ah = bh - 2 * pad - labH;
+  const sc = Math.min(aw / dx, ah / dy);
+  const ox = x + bw / 2 - (w2.minx + w2.maxx) / 2 * sc, oy = y + pad + ah / 2 + (w2.miny + w2.maxy) / 2 * sc;
+  const tx = px => ox + px * sc, ty = py => oy - py * sc;
+  const cl = (v, a, b) => Math.max(a, Math.min(b, v));
+  ctx.save(); ctx.lineCap = 'round'; ctx.lineWidth = 2;
+  w2.lines.forEach(l => {
+    ctx.strokeStyle = l[4] ? 'rgba(240,122,18,' + cl(l[5] + 0.15, 0.4, 1) + ')' : 'rgba(40,40,40,' + cl(l[5] + 0.25, 0.3, 1) + ')';
+    ctx.beginPath(); ctx.moveTo(tx(l[0]), ty(l[1])); ctx.lineTo(tx(l[2]), ty(l[3])); ctx.stroke();
+  });
+  if (w2.dim){
+    const d = w2.dim, X1 = tx(d.x1), Y1 = ty(d.y1), X2 = tx(d.x2), Y2 = ty(d.y2);
+    const len = Math.hypot(X2 - X1, Y2 - Y1) || 1, nx = -(Y2 - Y1) / len * 7, ny = (X2 - X1) / len * 7;
+    ctx.strokeStyle = '#d96a0a'; ctx.lineWidth = 2;
+    ctx.setLineDash([8, 6]); ctx.beginPath(); ctx.moveTo(X1, Y1); ctx.lineTo(X2, Y2); ctx.stroke(); ctx.setLineDash([]);
+    [[X1, Y1], [X2, Y2]].forEach(P => { ctx.beginPath(); ctx.moveTo(P[0] - nx, P[1] - ny); ctx.lineTo(P[0] + nx, P[1] + ny); ctx.stroke(); });
+    ctx.fillStyle = '#b65100'; ctx.font = '700 20px Helvetica, Arial, sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'alphabetic';
+    ctx.fillText(d.label, cl((X1 + X2) / 2, x + 60, x + bw - 60), Math.min((Y1 + Y2) / 2 + 26, y + bh - 8));
+  }
+  ctx.restore();
+}
+
+/* ----- JPEG (imagem com cada peça, o desenho e as medidas; desenhada em canvas) ----- */
+function buildJpegBlob(entries, when, modo){
+  const W = 1240, M = 56, CW = W - 2 * M, BADGE = 120, TX = M + BADGE + 8, DRAW = 360;
+  const FONT = 'Helvetica, Arial, sans-serif', ORANGE = '#f07a12';
+  const c = document.createElement('canvas'), ctx = c.getContext('2d');
+  const setF = (size, bold) => { ctx.font = (bold ? '700 ' : '400 ') + size + 'px ' + FONT; };
+  const wrap = (text, maxW, size, bold) => {
+    setF(size, bold);
+    const out = []; let line = '';
+    String(text).split(' ').forEach(w => {
+      const cand = line ? line + ' ' + w : w;
+      if (ctx.measureText(cand).width <= maxW || !line) line = cand; else { out.push(line); line = w; }
+    });
+    out.push(line); return out;
+  };
+  const d = when ? new Date(when) : new Date(), p2 = n => String(n).padStart(2, '0');
+  const stamp = p2(d.getDate()) + '/' + p2(d.getMonth() + 1) + '/' + d.getFullYear() + ' ' + p2(d.getHours()) + ':' + p2(d.getMinutes());
+  const modoTxt = modo === 'jateada' ? 'Jateada' : 'Pintada';
+  const total = entries.reduce((s, e) => s + e.area, 0);
+  const comTinta = entries.filter(e => e.litros != null);
+
+  const items = entries.map(e => {
+    const w2 = wireFor(e);
+    const TW = CW - BADGE - 24 - (w2 ? DRAW + 16 : 0);
+    const title = [e.ref, e.desc].filter(Boolean).join(' — ') || 'Sem referência';
+    const tl = wrap(title, TW, 30, true);
+    const dl = [];
+    (e.dims ? e.dims.split('; ') : []).forEach(x => wrap('• ' + x, TW, 24, false).forEach(l => dl.push(l)));
+    let h = 22 + tl.length * 38 + 34 + dl.length * 32 + 44 + 18 + (e.litros != null ? 32 : 0);
+    if (w2) h = Math.max(h, 270);
+    return {e, tl, dl, h, w2};
+  });
+  const HEAD = 130, FOOT = 120;
+  const H = HEAD + 24 + items.reduce((s, it) => s + it.h + 16, 0) + FOOT;
+  c.width = W; c.height = H;
+
+  ctx.fillStyle = '#ffffff'; ctx.fillRect(0, 0, W, H);
+  ctx.fillStyle = '#333333'; ctx.fillRect(0, 0, W, HEAD);
+  ctx.fillStyle = ORANGE; ctx.fillRect(0, HEAD - 6, W, 6);
+  ctx.textBaseline = 'alphabetic'; ctx.fillStyle = '#ffffff';
+  setF(44, true); ctx.textAlign = 'left'; ctx.fillText('DELINEAMENTO', M, 62);
+  setF(26, false); ctx.fillText('Área de superfície ' + modoTxt, M, 100);
+  ctx.textAlign = 'right'; setF(26, true); ctx.fillText(stamp, W - M, 62);
+  setF(24, false); ctx.fillText(entries.length + (entries.length === 1 ? ' elemento' : ' elementos'), W - M, 100);
+
+  let y = HEAD + 24;
+  items.forEach((it, i) => {
+    const e = it.e;
+    ctx.fillStyle = i % 2 ? '#f7f7f7' : '#ffffff'; ctx.fillRect(M, y, CW, it.h);
+    ctx.strokeStyle = '#d0d0d0'; ctx.lineWidth = 2; ctx.strokeRect(M, y, CW, it.h);
+    ctx.fillStyle = ORANGE; ctx.fillRect(M, y, 8, it.h);
+    ctx.textAlign = 'center'; ctx.fillStyle = ORANGE; setF(56, true);
+    ctx.fillText(e.qtd + 'x', M + 8 + BADGE / 2, y + it.h / 2 + 20);
+    ctx.textAlign = 'left';
+    let ty = y + 22 + 28;
+    ctx.fillStyle = '#000000'; setF(30, true);
+    it.tl.forEach(l => { ctx.fillText(l, TX, ty); ty += 38; });
+    ctx.fillStyle = '#555555'; setF(24, false);
+    ctx.fillText(e.type, TX, ty - 2); ty += 34;
+    ctx.fillStyle = '#222222'; setF(24, false);
+    it.dl.forEach(l => { ctx.fillText(l, TX, ty); ty += 32; });
+    ctx.fillStyle = '#000000'; setF(26, true);
+    ctx.fillText('Área: ' + fmtN(e.area) + ' m²' + (e.qtd > 1 ? '  (' + fmtN(e.unitArea) + ' m² por peça)' : ''), TX, ty + 12);
+    if (e.litros != null) ctx.fillText('Tinta (com perdas): ' + fmtN(e.litros) + ' L', TX, ty + 44);
+    if (it.w2){
+      const bx = M + CW - DRAW - 10, by = y + 10, bw = DRAW, bh = it.h - 20;
+      ctx.fillStyle = '#ffffff'; ctx.fillRect(bx, by, bw, bh);
+      ctx.strokeStyle = '#e0e0e0'; ctx.lineWidth = 1; ctx.strokeRect(bx, by, bw, bh);
+      drawWire(ctx, it.w2, bx, by, bw, bh);
+    }
+    y += it.h + 16;
+  });
+
+  ctx.fillStyle = '#eeeeee'; ctx.fillRect(M, y + 4, CW, 70);
+  ctx.fillStyle = '#333333'; ctx.fillRect(M, y + 4, CW, 3);
+  ctx.fillStyle = '#000000'; ctx.textAlign = 'left'; setF(30, true); ctx.fillText('ÁREA TOTAL', M + 20, y + 52);
+  ctx.textAlign = 'right'; ctx.fillStyle = ORANGE;
+  ctx.fillText(fmtN(total) + ' m²' + (comTinta.length ? '   ·   Tinta ≈ ' + fmtN(comTinta.reduce((s, e) => s + e.litros, 0)) + ' L' : ''), M + CW - 20, y + 52);
+  ctx.fillStyle = '#777777'; ctx.textAlign = 'left'; setF(20, false);
+  ctx.fillText('NaMedida — Delineamento', M, H - 28);
+  return new Promise(res => c.toBlob(res, 'image/jpeg', 0.92));
 }
 /*EXPORT-END*/
 
@@ -982,7 +1126,8 @@ function buildPdfBytes(entries, when, modo){
     const vol = paintVolume(total, parse($('dft').value), parse($('sv').value), parse($('perda').value));
     last = {
       ts: Date.now(), ref: $('ref').value.trim(), desc: $('desc').value.trim(),
-      type: TYPES[type].label, qtd, unitArea: r.area, area: total,
+      type: TYPES[type].label, typeKey: type, unit, unitLabel: UNITS[unit].label, vals: Object.assign({}, vals),
+      qtd, unitArea: r.area, area: total,
       litros: vol ? vol.real : null,
       dims: describeDims()
     };
@@ -1102,6 +1247,18 @@ function buildPdfBytes(entries, when, modo){
     } catch(e){ if (e && e.name === 'AbortError') return; }
     download(blob, name);
   }
+  async function doJpeg(entries, when){
+    const blob = await buildJpegBlob(entries, when, modoTexto);
+    if (!blob){ flash('Não foi possível gerar a imagem.'); return; }
+    const name = 'delineamento-' + modoTexto + '-' + fileStamp() + '.jpg';
+    try {
+      if (window.matchMedia('(pointer:coarse)').matches && navigator.canShare){
+        const file = new File([blob], name, {type: 'image/jpeg'});
+        if (navigator.canShare({files: [file]})){ await navigator.share({files: [file], title: 'Delineamento'}); return; }
+      }
+    } catch(e){ if (e && e.name === 'AbortError') return; }
+    download(blob, name);
+  }
   function exportTxt(){
     if (!hist.length) return;
     download(new Blob(['﻿' + buildText(histEntries())], {type: 'text/plain;charset=utf-8'}), 'delineamento-' + fileStamp() + '.txt');
@@ -1114,7 +1271,7 @@ function buildPdfBytes(entries, when, modo){
       const left = document.createElement('div');
       const t = document.createElement('b'); t.textContent = (e.ref || e.desc || e.type) + ' — ' + nf(e.area) + ' m²';
       const s = document.createElement('span');
-      s.textContent = e.type + (e.qtd > 1 ? ' × ' + e.qtd : '') + (e.desc && e.ref ? ' · ' + e.desc : '') + (e.litros != null ? ' · ' + nf(e.litros) + ' L' : '');
+      s.textContent = (e.qtd > 1 ? e.qtd + 'x ' : '') + e.type + (e.desc && e.ref ? ' · ' + e.desc : '') + (e.litros != null ? ' · ' + nf(e.litros) + ' L' : '');
       left.append(t, s);
       const del = document.createElement('button'); del.className = 'small'; del.type = 'button'; del.textContent = 'Remover';
       del.addEventListener('click', () => { hist.splice(i, 1); saveHist(); renderHist(); });
@@ -1143,6 +1300,8 @@ function buildPdfBytes(entries, when, modo){
   $('xlsx').addEventListener('click', exportXlsx);
   $('pdfRes').addEventListener('click', () => { if (last) doPdf([last], last.ts); });
   $('hPdf').addEventListener('click', () => { if (hist.length) doPdf(histEntries()); });
+  $('jpgRes').addEventListener('click', () => { if (last) doJpeg([last], last.ts); });
+  $('hJpg').addEventListener('click', () => { if (hist.length) doJpeg(histEntries()); });
   $('hCopy').addEventListener('click', () => { if (hist.length) doCopy(buildText(histEntries())); });
   $('hShare').addEventListener('click', () => { if (hist.length) doShare(buildText(histEntries())); });
   $('hWa').addEventListener('click', () => { if (hist.length) doWhatsApp(buildText(histEntries())); });
@@ -1273,9 +1432,8 @@ function buildPdfBytes(entries, when, modo){
 
   function lenDim(L, poly, label){ var y = -ext(poly) * 1.6 - L * 0.04; return {a:[-L / 2, y, 0], b:[L / 2, y, 0], label:label}; }
 
-  function build(){
-    var t = current(), s = [], d = null, u = unitLabel();
-    var lab = function(id){ var el = document.getElementById('f-' + id); var v = el && String(el.value).trim(); return SYM[id] + ' = ' + (v ? v.replace('.', ',') + ' ' + u : '?'); };
+  function geom(t, num, sel, lab){
+    var s = [], d = null;
     if (t === 'tubo'){
       var D = num('d') || 1, r = D / 2, L = clamp(num('l') || 3 * D, 2.2 * D, 3.4 * D), tt = num('t'), sh = circle(r);
       s = extrude(sh, L, 5, 2, circle(Math.max(r - (tt && tt < r ? tt : r * 0.08), r * 0.25)));
@@ -1345,8 +1503,17 @@ function buildPdfBytes(entries, when, modo){
     if (d) [d.a, d.b].forEach(function(p){ p.forEach(function(v){ m = Math.max(m, Math.abs(v) * 0.9); }); });
     m = m || 1;
     var nz = function(p){ return p.map(function(v){ return v / m; }); };
-    segs = s.map(function(g){ return [nz(g[0]), nz(g[1]), g[2]]; });
-    dim = d ? {a:nz(d.a), b:nz(d.b), label:d.label} : null;
+    return {
+      segs: s.map(function(g){ return [nz(g[0]), nz(g[1]), g[2]]; }),
+      dim: d ? {a:nz(d.a), b:nz(d.b), label:d.label} : null
+    };
+  }
+
+  function build(){
+    var u = unitLabel();
+    var lab = function(id){ var el = document.getElementById('f-' + id); var v = el && String(el.value).trim(); return SYM[id] + ' = ' + (v ? v.replace('.', ',') + ' ' + u : '?'); };
+    var g0 = geom(current(), num, sel, lab);
+    segs = g0.segs; dim = g0.dim;
 
     // leitura dos parâmetros digitados (— quando vazio)
     var parts = [];
@@ -1357,6 +1524,29 @@ function buildPdfBytes(entries, when, modo){
     dimsEl.textContent = parts.join('   ·   ');
     dirty = false;
   }
+
+  // Projeção 2D estática de uma peça salva (usada nas exportações PDF/JPEG)
+  window.NM_wire2d = function(entry, yaw, pitch){
+    if (!entry || !entry.vals || ['tubo','perfil','viga','chapa','cantoneira','tanque','linear'].indexOf(entry.typeKey) < 0) return null;
+    var v = entry.vals, u = entry.unitLabel || '';
+    var nm = function(id){ var x = v[id]; if (x == null) return null; var n = Number(String(x).trim().replace(',', '.')); return n > 0 ? n : null; };
+    var sl = function(id, def){ return (v[id] != null && v[id] !== '') ? v[id] : def; };
+    var lb = function(id){ var x = v[id] == null ? '' : String(v[id]).trim(); return SYM[id] + ' = ' + (x ? x.replace('.', ',') + ' ' + u : '?'); };
+    var g; try { g = geom(entry.typeKey, nm, sl, lb); } catch(err){ return null; }
+    var ya = yaw == null ? -0.6 : yaw, pi = pitch == null ? 0.42 : pitch;
+    var cyw = Math.cos(ya), syw = Math.sin(ya), cp = Math.cos(pi), sp = Math.sin(pi);
+    function pj(p){ var x1 = p[0] * cyw + p[2] * syw, z1 = -p[0] * syw + p[2] * cyw, y1 = p[1] * cp - z1 * sp, z2 = p[1] * sp + z1 * cp, f = 3.2 / (3.2 + z2); return [x1 * f, y1 * f, z2]; }
+    var minx = 1e9, maxx = -1e9, miny = 1e9, maxy = -1e9;
+    function bb(P){ minx = Math.min(minx, P[0]); maxx = Math.max(maxx, P[0]); miny = Math.min(miny, P[1]); maxy = Math.max(maxy, P[1]); }
+    var lines = g.segs.map(function(sg){
+      var a = pj(sg[0]), b = pj(sg[1]); bb(a); bb(b);
+      return [a[0], a[1], b[0], b[1], sg[2] ? 1 : 0, clamp(0.62 - (a[2] + b[2]) * 0.28, 0.14, 0.9)];
+    });
+    var dm = null;
+    if (g.dim){ var A = pj(g.dim.a), B = pj(g.dim.b); bb(A); bb(B); dm = {x1:A[0], y1:A[1], x2:B[0], y2:B[1], label:g.dim.label}; }
+    if (!lines.length) return null;
+    return {lines:lines, dim:dm, minx:minx, maxx:maxx, miny:miny, maxy:maxy};
+  };
 
   function fit(){ var r = cv.getBoundingClientRect(), dp = window.devicePixelRatio || 1; cv.width = Math.max(1, Math.round(r.width * dp)); cv.height = Math.max(1, Math.round(r.height * dp)); }
   function draw(){
